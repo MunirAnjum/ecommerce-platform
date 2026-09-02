@@ -1,0 +1,22 @@
+<Solution>
+  <Project Path="Services/Auth/AuthService.API/AuthService.API.csproj" Id="a13ebdee-f003-4f3e-9142-7afeb8f81bfb" />
+  <Project Path="Services/Auth/AuthService.Application/AuthService.Application.csproj" Id="b54915c5-4dc1-4467-919b-6dd6b0e28a81" />
+  <Project Path="Services/Auth/AuthService.Domain/AuthService.Domain.csproj" Id="cc4e07ce-697e-4c4e-ae85-72565449ab9e" />
+  <Project Path="Services/Auth/AuthService.Infrastructure/AuthService.Infrastructure.csproj" Id="8830eb4b-c1c6-4e10-8660-944b007ea7b9" />
+  <Project Path="Services/Inventory/InventoryService.API/InventoryService.API.csproj" Id="5af0dfc9-ef3f-404f-be10-1ec92a090252" />
+  <Project Path="Services/Inventory/InventoryService.Application/InventoryService.Application.csproj" Id="bf3be757-f825-4370-9cc6-c97611ef4eda" />
+  <Project Path="Services/Inventory/InventoryService.Domain/InventoryService.Domain.csproj" Id="a77cecf8-f90e-4925-878f-b060481137e9" />
+  <Project Path="Services/Inventory/InventoryService.Infrastructure/InventoryService.Infrastructure.csproj" Id="bfc79165-5ed8-48d6-90ba-be37d3088c9f" />
+  <Project Path="Services/Order/OrderService.API/OrderService.API.csproj" />
+  <Project Path="Services/Order/OrderService.Application/OrderService.Application.csproj" />
+  <Project Path="Services/Order/OrderService.Domain/OrderService.Domain.csproj" />
+  <Project Path="Services/Order/OrderService.Infrastructure/OrderService.Infrastructure.csproj" />
+  <Project Path="Services/Payment/PaymentService.API/PaymentService.API.csproj" Id="7fb217af-a81a-495a-a289-071bbf4a8d34" />
+  <Project Path="Services/Payment/PaymentService.Application/PaymentService.Application.csproj" Id="cce48ebe-1496-45db-bab0-698f25736061" />
+  <Project Path="Services/Payment/PaymentService.Domain/PaymentService.Domain.csproj" Id="d951c4a5-5f2a-4c6f-9981-b1c3a4436e90" />
+  <Project Path="Services/Payment/PaymentService.Infrastructure/PaymentService.Infrastructure.csproj" Id="53cb8ac9-605b-4905-ba01-c1bc9a63a0b2" />
+  <Project Path="Services/Product/ProductService.API/ProductService.API.csproj" Id="fab2b014-d562-44f5-ac75-0da5775868a5" />
+  <Project Path="Services/Product/ProductService.Application/ProductService.Application.csproj" Id="62792c6d-952e-4796-9932-755decb367f5" />
+  <Project Path="Services/Product/ProductService.Domain/ProductService.Domain.csproj" Id="142624a5-7494-4b28-89ab-69f9c7de52c6" />
+  <Project Path="Services/Product/ProductService.Infrastructure/ProductService.Infrastructure.csproj" Id="46fad3a1-ba11-44ed-bb2c-5eca69ade545" />
+</Solution>

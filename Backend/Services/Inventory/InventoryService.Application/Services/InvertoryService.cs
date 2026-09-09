@@ -85,7 +85,7 @@ public class InvertoryService : IInventoryService
 
     public async Task<InventoryResponse> ReserveStockAsync(Guid productId, ReserveStockRequest request)
     {
-        if(request.Quantity < 0)
+        if(request.Quantity <= 0)
         {
             throw new InvalidOperationException("Quantity can not be zero.");
         }
@@ -106,7 +106,7 @@ public class InvertoryService : IInventoryService
 
     public async Task<InventoryResponse> ReleaseStockAsync(Guid productId, ReserveStockRequest request)
     {
-        if(request.Quantity < 0)
+        if(request.Quantity <= 0)
         {
             throw new InvalidOperationException("Quantity must be greater than zero.");
         }
@@ -128,7 +128,7 @@ public class InvertoryService : IInventoryService
 
     public async Task<InventoryResponse> ConfirmReservationAsync(Guid productId, ReserveStockRequest request)
     {
-        if (request.Quantity < 0)
+        if (request.Quantity <= 0)
         {
             throw new InvalidOperationException(
                 "Quantity must be greater than zero.");

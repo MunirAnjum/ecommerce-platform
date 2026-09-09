@@ -62,7 +62,7 @@ public class OrderController : ControllerBase
     }
 
     [HttpPut("{orderId:guid}/status")]
-    [Authorize(Roles ="Admin")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateStatus(Guid orderId, UpdateOrderStatusRequest request)
     {
         var result = await _orderService.UpdateStatusAsync(orderId, request);
@@ -101,6 +101,24 @@ public class OrderController : ControllerBase
         {
             return NotFound();
         }
+
+        return Ok(order);
+    }
+
+    [Authorize(Policy = "InternalService")]
+    [HttpGet("internal/{id:guid}")]
+    public async Task<IActionResult> GetByIdInternal(Guid id)
+    {
+        var order = await _orderService.GetByIdForAdminAsync(id);
+
+        return Ok(order);
+    }
+
+    [Authorize(Policy = "InternalService")]
+    [HttpPost("internal/{id:guid}/payment-confirmed")]
+    public async Task<IActionResult> PaymentConfirmed(Guid id)
+    {
+        var order = await _orderService.ConfirmPaymentAsync(id);
 
         return Ok(order);
     }

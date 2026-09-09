@@ -154,12 +154,15 @@ public class OrderService : IOrderService
 
         return MapToResponse(order);
     }
-        
-    public async Task<OrderResponse> CancelAsync(Guid userId, Guid orderId, bool isAdmin)
+
+    public async Task<OrderResponse> CancelAsync(
+    Guid userId,
+    Guid orderId,
+    bool isAdmin)
     {
         var order = await _orderRepository.GetByIdAsync(orderId);
 
-        if(order is null)
+        if (order is null)
         {
             throw new KeyNotFoundException("Order not found.");
         }
@@ -167,24 +170,30 @@ public class OrderService : IOrderService
         // Customer can cancel only their own order.
         if (!isAdmin && order.UserId != userId)
         {
-            throw new UnauthorizedAccessException("You can not access this order.");
+            throw new UnauthorizedAccessException(
+                "You cannot access this order.");
         }
 
-        // Only orders whose inventory is still reserved can use the Release operation.
-        if (order.Status != OrderStatus.Pending)
+        if (order.Status == OrderStatus.Pending)
+        {
+            // Inventory is still reserved.
+            foreach (var item in order.Items)
+            {
+                await _inventoryServiceClient.ReleaseStockAsync(
+                    item.ProductId,
+                    item.Quantity);
+            }
+        }
+        else if (order.Status == OrderStatus.Confirmed)
+        {
+            // Inventory was already confirmed/consumed.
+            // Do NOT release it here.
+        }
+        else
         {
             throw new InvalidOperationException(
-                "Only pending orders can be cancelled.");
+                "Only pending or confirmed orders can be cancelled.");
         }
-
-        // Release reserved inventory for every order item.
-        foreach (var item in order.Items)
-        {
-            await _inventoryServiceClient.ReleaseStockAsync(
-                item.ProductId,
-                item.Quantity);
-        }
-
 
         order.Cancel();
 
@@ -221,24 +230,54 @@ public class OrderService : IOrderService
                 break;
 
             case OrderStatus.Cancelled:
-                if (order.Status != OrderStatus.Pending)
+
+                if (order.Status == OrderStatus.Pending)
+                {
+                    foreach (var item in order.Items)
+                    {
+                        await _inventoryServiceClient.ReleaseStockAsync(
+                            item.ProductId,
+                            item.Quantity);
+                    }
+                }
+                else if (order.Status != OrderStatus.Confirmed)
                 {
                     throw new InvalidOperationException(
-                        "Only pending orders can be cancelled.");
+                        "Only pending or confirmed orders can be cancelled.");
                 }
 
-                foreach (var item in order.Items)
-                {
-                    await _inventoryServiceClient.ReleaseStockAsync(
-                        item.ProductId,
-                        item.Quantity);
-                }
                 order.Cancel();
                 break;
 
             default:
                 throw new InvalidOperationException("Invalid order status.");
         }
+
+        await _orderRepository.UpdateAsync(order);
+
+        return MapToResponse(order);
+    }
+
+    public async Task<OrderResponse> ConfirmPaymentAsync(Guid orderId)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId);
+
+        if(order is null)
+        {
+            throw new KeyNotFoundException("Order not found.");
+        }
+
+        if(order.Status != OrderStatus.Pending)
+        {
+            throw new InvalidOperationException("Only pending order can be confirm after payment.");
+        }
+
+        foreach(var item in order.Items)
+        {
+            await _inventoryServiceClient.ConfirmStockAsync(item.ProductId, item.Quantity);
+        }
+
+        order.Confirm();
 
         await _orderRepository.UpdateAsync(order);
 

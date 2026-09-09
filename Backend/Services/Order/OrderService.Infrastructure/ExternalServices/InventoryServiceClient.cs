@@ -40,4 +40,18 @@ public class InventoryServiceClient : IInventoryServiceClient
 
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task ConfirmStockAsync(Guid productId, int quantity)
+    {
+        var request = new
+        {
+            Quantity = quantity
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/inventory/{productId}/confirm",
+            request);
+
+        response.EnsureSuccessStatusCode();
+    }
 }

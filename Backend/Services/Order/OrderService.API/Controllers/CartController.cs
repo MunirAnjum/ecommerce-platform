@@ -64,7 +64,7 @@ public class CartController : ControllerBase
 
         if(!Guid.TryParse(value, out var userId))
         {
-            throw new UnauthorizedAccessException("Unvalid user identity.");
+            throw new UnauthorizedAccessException("Invalid user identity.");
         }
 
         return userId;

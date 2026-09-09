@@ -75,8 +75,8 @@ public class Order
 
     public void Cancel()
     {
-        if(Status == OrderStatus.Shipped)
-            throw new InvalidOperationException("The shipped order can not be calceled.");
+        if(Status == OrderStatus.Shipped || Status == OrderStatus.Delivered)
+            throw new InvalidOperationException("The shipped or delivered order can not be calceled.");
 
         if (Status == OrderStatus.Cancelled)
             return;

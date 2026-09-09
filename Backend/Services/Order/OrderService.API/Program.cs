@@ -1,8 +1,11 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using OrderService.API.Middleware;
+using OrderService.API.Security;
 using OrderService.Application.Interfaces;
 using OrderService.Application.Services;
 using OrderService.Application.Validators;
@@ -87,6 +90,8 @@ builder.Services.AddHttpClient<IInventoryServiceClient, InventoryServiceClient>(
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreateOrderRequestValidator>();
 
+builder.Services.AddSingleton<IAuthorizationHandler, InternalServiceAuthorizationHandler>();
+
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 
 var jwtKey = jwtSettings["Key"]
@@ -99,7 +104,14 @@ var jwtAudience = jwtSettings["Audience"]
     ?? throw new InvalidOperationException("JWT audience is not configured.");
 
 builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+
+        options.DefaultChallengeScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+    })
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -117,9 +129,25 @@ builder.Services
 
             ClockSkew = TimeSpan.Zero
         };
-    });
+    })
+    .AddScheme<AuthenticationSchemeOptions,
+        InternalServiceAuthenticationHandler>(
+        "InternalService",
+        options => { });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(
+        "InternalService",
+        policy =>
+        {
+            policy.AuthenticationSchemes.Add(
+                "InternalService");
+
+            policy.Requirements.Add(
+                new InternalServiceRequirement());
+        });
+});
 
 var app = builder.Build();
 
@@ -130,6 +158,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+//app.UseMiddleware<InternalServiceAuthenticationMiddleware>();
 
 app.UseHttpsRedirection();
 

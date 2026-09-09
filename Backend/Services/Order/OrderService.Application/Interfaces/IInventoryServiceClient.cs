@@ -10,4 +10,6 @@ public interface IInventoryServiceClient
     Task ReserveStockAsync(Guid productId, int quantity);
 
     Task ReleaseStockAsync(Guid productId, int quantity);
+
+    Task ConfirmStockAsync(Guid productId, int quantity);
 }

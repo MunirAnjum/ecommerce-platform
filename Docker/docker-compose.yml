@@ -1,0 +1,76 @@
+services:
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: ecommerce-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  postgres:
+    image: postgres:17
+    container_name: ecommerce-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ecommerce@123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  payment-service:
+    build:
+      context: ../Backend/Services/Payment
+      dockerfile: PaymentService.API/Dockerfile
+    container_name: ecommerce-payment
+    depends_on:
+      - postgres
+      - rabbitmq
+    ports:
+      - "5005:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=ecommercepaymentdb;Username=postgres;Password=ecommerce@123"
+
+      InternalServices__ServiceKey: ${PAYMENT_SERVICE_KEY}
+
+      Services__OrderService: "https://host.docker.internal:7247"
+
+      InternalServices__OrderServiceKey: ${ORDER_SERVICE_KEY}
+
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__UserName: guest
+      RabbitMq__Password: guest
+
+  notification-service:
+    build:
+      context: ../Backend/Services/Notification
+      dockerfile: NotificationService.API/Dockerfile
+    container_name: ecommerce-notification
+    depends_on:
+      - postgres
+      - rabbitmq
+    ports:
+      - "5006:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__UserName: guest
+      RabbitMq__Password: guest
+
+      Email__From: ${EMAIL_FROM}
+      Email__SmtpServer: ${EMAIL_SMTP_SERVER}
+      Email__Port: ${EMAIL_PORT}
+      Email__Username: ${EMAIL_USERNAME}
+      Email__Password: ${EMAIL_PASSWORD}
+
+volumes:
+  rabbitmq_data:
+  postgres_data:

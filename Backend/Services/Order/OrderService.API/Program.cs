@@ -9,7 +9,9 @@ using OrderService.API.Security;
 using OrderService.Application.Interfaces;
 using OrderService.Application.Services;
 using OrderService.Application.Validators;
+using OrderService.Infrastructure.Configuration;
 using OrderService.Infrastructure.ExternalServices;
+using OrderService.Infrastructure.Messaging;
 using OrderService.Infrastructure.Persistences;
 using OrderService.Infrastructure.Repositories;
 using System.Text;
@@ -69,6 +71,17 @@ builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<ICartService, CartService>();
 
 builder.Services.AddScoped<IOrderService, OrderApplicationService>();
+
+builder.Services.AddScoped<IOutboxRepository, OutboxRepository>();
+
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+builder.Services.AddScoped<IRabbitMqPublisher, RabbitMqEventPublisher>();
+
+builder.Services.AddHostedService<OutboxPublisher>();
+
+builder.Services.Configure<RabbitMqSettings>(
+    builder.Configuration.GetSection("RabbitMq"));
 
 builder.Services.AddHttpClient<IProductServiceClient, ProductServiceClient>(
     client =>

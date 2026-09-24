@@ -1,7 +1,10 @@
 ﻿using OrderService.Application.DTOs;
+using OrderService.Application.Events;
 using OrderService.Application.Interfaces;
+using OrderService.Application.Outbox;
 using OrderService.Domain.Entities;
 using OrderService.Domain.Enums;
+using System.Text.Json;
 
 namespace OrderService.Application.Services;
 
@@ -11,17 +14,23 @@ public class OrderService : IOrderService
     private readonly ICartRepository _cartRepository;
     private readonly IProductServiceClient _productServiceClient;
     private readonly IInventoryServiceClient _inventoryServiceClient;
+    private readonly IOutboxRepository _outboxRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public OrderService(
         IOrderRepository orderRepository,
         ICartRepository cartRepository,
         IProductServiceClient productServiceClient,
-        IInventoryServiceClient inventoryServiceClient)
+        IInventoryServiceClient inventoryServiceClient,
+        IOutboxRepository outboxRepository,
+        IUnitOfWork unitOfWork)
     {
         _orderRepository = orderRepository;
         _cartRepository = cartRepository;
         _productServiceClient = productServiceClient;
         _inventoryServiceClient = inventoryServiceClient;
+        _outboxRepository = outboxRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<OrderResponse> CreateAsync(   
@@ -93,9 +102,33 @@ public class OrderService : IOrderService
             order.Items.Add(item);
         }
 
-        await _orderRepository.AddAsync(order);
-
         await _cartRepository.ClearItemsAsync(cart.Id);
+
+        var orderCreatedEvent = new OrderCreatedEvent
+        {
+            OrderId = order.Id,
+            UserId = order.UserId,
+            TotalAmount = order.TotalAmount,
+            Recipient = "muniranjum96@gmail.com"
+        };
+
+        var payload = JsonSerializer.Serialize(orderCreatedEvent);
+
+        var outboxMessage = new OutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            EventType = nameof(OrderCreatedEvent),
+            RoutingKey = "order.created",
+            Payload = payload,
+            OccurredOnUtc = DateTime.UtcNow
+        };
+
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await _orderRepository.AddAsync(order);
+
+            await _outboxRepository.AddAsync(outboxMessage);
+        });
 
         return MapToResponse(order);
     }
@@ -155,10 +188,7 @@ public class OrderService : IOrderService
         return MapToResponse(order);
     }
 
-    public async Task<OrderResponse> CancelAsync(
-    Guid userId,
-    Guid orderId,
-    bool isAdmin)
+    public async Task<OrderResponse> CancelAsync(Guid userId, Guid orderId, bool isAdmin)
     {
         var order = await _orderRepository.GetByIdAsync(orderId);
 
@@ -167,7 +197,6 @@ public class OrderService : IOrderService
             throw new KeyNotFoundException("Order not found.");
         }
 
-        // Customer can cancel only their own order.
         if (!isAdmin && order.UserId != userId)
         {
             throw new UnauthorizedAccessException(
@@ -187,7 +216,6 @@ public class OrderService : IOrderService
         else if (order.Status == OrderStatus.Confirmed)
         {
             // Inventory was already confirmed/consumed.
-            // Do NOT release it here.
         }
         else
         {
@@ -208,25 +236,29 @@ public class OrderService : IOrderService
 
         if(order is null)
         {
-            throw new Exception("Order not found.");
+            throw new KeyNotFoundException("Order not found.");
         }
 
-        switch(request.Status)
+        switch (request.Status)
         {
             case OrderStatus.Confirmed:
+
                 order.Confirm();
                 break;
 
             case OrderStatus.Processing:
-                order.Process(); 
+
+                order.Process();
                 break;
 
             case OrderStatus.Shipped:
+
                 order.Ship();
                 break;
 
             case OrderStatus.Delivered:
-                order.Deliver(); 
+
+                order.Deliver();
                 break;
 
             case OrderStatus.Cancelled:
@@ -250,10 +282,65 @@ public class OrderService : IOrderService
                 break;
 
             default:
-                throw new InvalidOperationException("Invalid order status.");
+
+                throw new InvalidOperationException(
+                    "Invalid order status.");
         }
 
-        await _orderRepository.UpdateAsync(order);
+        OutboxMessage? outboxMessage = null;
+
+        if (order.Status == OrderStatus.Shipped)
+        {
+            var orderShippedEvent = new OrderShippedEvent
+            {
+                OrderId = order.Id,
+                UserId = order.UserId,
+                Recipient = "muniranjum96@gmail.com"
+            };
+
+            var payload =
+                JsonSerializer.Serialize(orderShippedEvent);
+
+            outboxMessage = new OutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                EventType = nameof(OrderShippedEvent),
+                RoutingKey = "order.shipped",
+                Payload = payload,
+                OccurredOnUtc = DateTime.UtcNow
+            };
+        }
+        else if (order.Status == OrderStatus.Delivered)
+        {
+            var orderDeliveredEvent = new OrderDeliveredEvent
+            {
+                OrderId = order.Id,
+                UserId = order.UserId,
+                Recipient = "muniranjum96@gmail.com"
+            };
+
+            var payload =
+                JsonSerializer.Serialize(orderDeliveredEvent);
+
+            outboxMessage = new OutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                EventType = nameof(OrderDeliveredEvent),
+                RoutingKey = "order.delivered",
+                Payload = payload,
+                OccurredOnUtc = DateTime.UtcNow
+            };
+        }
+
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await _orderRepository.UpdateAsync(order);
+
+            if (outboxMessage is not null)
+            {
+                await _outboxRepository.AddAsync(outboxMessage);
+            }
+        });
 
         return MapToResponse(order);
     }

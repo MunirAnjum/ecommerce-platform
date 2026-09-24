@@ -1,4 +1,5 @@
 ﻿using OrderService.Application.DTOs;
+using OrderService.Application.Events;
 using OrderService.Domain.Entities;
 using System;
 using System.Collections.Generic;

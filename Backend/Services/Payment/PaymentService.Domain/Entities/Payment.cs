@@ -69,7 +69,7 @@ namespace PaymentService.Domain.Entities
             UpdatedAt = DateTime.UtcNow;
         }
 
-        public void Complete(string? transectionId = null)
+        public void Complete(string? transactionId = null)
         {
             if(Status != PaymentStatus.Processing && Status != PaymentStatus.Pending)
             {
@@ -77,7 +77,7 @@ namespace PaymentService.Domain.Entities
             }
 
             Status = PaymentStatus.Completed;
-            TransactionId = transectionId;
+            TransactionId = transactionId;
             UpdatedAt = DateTime.UtcNow;
         }
 

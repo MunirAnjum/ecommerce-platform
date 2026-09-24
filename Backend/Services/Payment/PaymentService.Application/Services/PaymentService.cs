@@ -1,12 +1,10 @@
 ﻿using PaymentService.Application.DTOs;
+using PaymentService.Application.Events;
 using PaymentService.Application.Interfaces;
+using PaymentService.Application.Outbox;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace PaymentService.Application.Services
 {
@@ -14,12 +12,21 @@ namespace PaymentService.Application.Services
     {
         private readonly IPaymentRepository _paymentRepository;
         private readonly IOrderServiceClient _orderServiceClient;
+        private readonly IOutboxRepository _outboxRepository;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public PaymentService(IPaymentRepository paymentRepository, IOrderServiceClient orderServiceClient)
+        public PaymentService(
+            IPaymentRepository paymentRepository, 
+            IOrderServiceClient orderServiceClient,
+            IOutboxRepository outboxRepository,
+            IUnitOfWork unitOfWork)
         {
             _paymentRepository = paymentRepository;
             _orderServiceClient = orderServiceClient;
+            _outboxRepository = outboxRepository;
+            _unitOfWork = unitOfWork;
         }
+
 
         public async Task<PaymentResponse> CreateAsync(Guid userId, CreatePaymentRequest request)
         {
@@ -52,9 +59,13 @@ namespace PaymentService.Application.Services
                 order.UserId,
                 order.TotalAmount,
                 request.Method
-                );
+            );
 
-            await _paymentRepository.AddAsync(payment);
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                await _paymentRepository.AddAsync(payment);
+            });
+            
 
             return MapToResponse(payment);
         }
@@ -82,20 +93,71 @@ namespace PaymentService.Application.Services
 
             payment.StartProcessing();
 
+            OutboxMessage? outboxMessage = null;
+
             if (request.ShouldSucceed)
             {
                 payment.Complete($"FAKE-{Guid.NewGuid()}");
+
+                var paymentCompletedEvent =
+                new PaymentCompletedEvent
+                {
+                    PaymentId = payment.Id,
+                    OrderId = payment.OrderId,
+                    UserId = payment.UserId,
+                    Amount = payment.Amount,
+                    TransactionId = payment.TransactionId,
+                    Recipient = "muniranjum96@gmail.com"
+                };
+
+                var payload = JsonSerializer.Serialize(paymentCompletedEvent);
+
+                outboxMessage = new OutboxMessage
+                {
+                    Id = Guid.NewGuid(),
+                    EventType = nameof(PaymentCompletedEvent),
+                    RoutingKey = "payment.completed",
+                    Payload = payload,
+                    OccurredOnUtc = DateTime.UtcNow
+                };
             }
             else
             {
                 payment.Fail();
+
+                var paymentFailedEvent = new PaymentFailedEvent
+                {
+                    PaymentId = payment.Id,
+                    OrderId = payment.OrderId,
+                    UserId = payment.UserId,
+                    Amount = payment.Amount,
+                    Recipient = "muniranjum96@gmail.com"
+                };
+
+
+                var payload = JsonSerializer.Serialize(paymentFailedEvent);
+
+                outboxMessage = new OutboxMessage
+                {
+                    Id = Guid.NewGuid(),
+                    EventType = nameof(PaymentFailedEvent),
+                    RoutingKey = "payment.failed",
+                    Payload = payload,
+                    OccurredOnUtc = DateTime.UtcNow
+                };
             }
 
-            await _paymentRepository.UpdateAsync(payment);
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                await _paymentRepository.UpdateAsync(payment);
+
+                await _outboxRepository.AddAsync(outboxMessage);
+            });
 
             if (payment.Status == PaymentStatus.Completed)
             {
-                await _orderServiceClient.ConfirmPaymentAsync(payment.OrderId);
+                await _orderServiceClient.ConfirmPaymentAsync(
+                    payment.OrderId);
             }
 
             return MapToResponse(payment);
@@ -109,7 +171,7 @@ namespace PaymentService.Application.Services
             if (payment is null)
             {
                 throw new KeyNotFoundException(
-                    "Payment not found.");
+                    "Payment not found.");  
             }
 
             if (payment.UserId != userId)

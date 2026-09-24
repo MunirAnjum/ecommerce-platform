@@ -1,10 +1,13 @@
-using Microsoft.EntityFrameworkCore;
-using PaymentService.Application.Interfaces;
-using PaymentService.Infrastructure.ExternalServices;
-using PaymentService.Infrastructure.Repositories;
-using PaymentService.Infrastructure.Persistences;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using PaymentService.Application.Events;
+using PaymentService.Application.Interfaces;
+using PaymentService.Infrastructure.Configuration;
+using PaymentService.Infrastructure.ExternalServices;
+using PaymentService.Infrastructure.Messaging;
+using PaymentService.Infrastructure.Persistences;
+using PaymentService.Infrastructure.Repositories;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer",
@@ -56,6 +60,17 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 
 builder.Services.AddScoped<IPaymentService, PaymentService.Application.Services.PaymentService>();
 
+builder.Services.AddScoped<IRabbitMqPublisher, RabbitMqEventPublisher>();
+
+builder.Services.AddScoped<IOutboxRepository, OutboxRepository>();
+
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+builder.Services.AddHostedService<OutboxPublisher>();
+
+builder.Services.Configure<RabbitMqSettings>(
+    builder.Configuration.GetSection("RabbitMq"));
+
 builder.Services.AddHttpClient<
     IOrderServiceClient,
     OrderServiceClient>(
@@ -66,19 +81,27 @@ builder.Services.AddHttpClient<
             ?? throw new InvalidOperationException(
                 "Order Service URL is not configured."));
 
-        var serviceKey =
+        var orderServiceKey =
             builder.Configuration[
-                "InternalServices:ServiceKey"];
+                "InternalServices:OrderServiceKey"];
 
-        if (string.IsNullOrWhiteSpace(serviceKey))
+        if (string.IsNullOrWhiteSpace(orderServiceKey))
         {
             throw new InvalidOperationException(
-                "Internal service key is not configured.");
+                "Order Service internal service key is not configured.");
         }
 
         client.DefaultRequestHeaders.Add(
             "X-Service-Key",
-            serviceKey);
+            orderServiceKey);
+    })
+    .ConfigurePrimaryHttpMessageHandler(() =>
+    {
+        return new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
     });
 
 var jwtSettings =

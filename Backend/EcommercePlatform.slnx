@@ -7,6 +7,10 @@
   <Project Path="Services/Inventory/InventoryService.Application/InventoryService.Application.csproj" Id="bf3be757-f825-4370-9cc6-c97611ef4eda" />
   <Project Path="Services/Inventory/InventoryService.Domain/InventoryService.Domain.csproj" Id="a77cecf8-f90e-4925-878f-b060481137e9" />
   <Project Path="Services/Inventory/InventoryService.Infrastructure/InventoryService.Infrastructure.csproj" Id="bfc79165-5ed8-48d6-90ba-be37d3088c9f" />
+  <Project Path="Services/Notification/NotificationService.API/NotificationService.API.csproj" Id="cc305e1a-98ec-415d-84e9-962689ef7493" />
+  <Project Path="Services/Notification/NotificationService.Application/NotificationService.Application.csproj" Id="4b2840eb-12ec-446c-a0d2-9fa5d3edb41a" />
+  <Project Path="Services/Notification/NotificationService.Domain/NotificationService.Domain.csproj" Id="b4208d80-6041-45ea-9904-9a765d9fa8e0" />
+  <Project Path="Services/Notification/NotificationService.Infrastructure/NotificationService.Infrastructure.csproj" Id="97079a77-def0-47f5-b2ea-d74950349b89" />
   <Project Path="Services/Order/OrderService.API/OrderService.API.csproj" />
   <Project Path="Services/Order/OrderService.Application/OrderService.Application.csproj" />
   <Project Path="Services/Order/OrderService.Domain/OrderService.Domain.csproj" />

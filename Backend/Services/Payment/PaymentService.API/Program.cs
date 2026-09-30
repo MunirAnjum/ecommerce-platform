@@ -94,14 +94,6 @@ builder.Services.AddHttpClient<
         client.DefaultRequestHeaders.Add(
             "X-Service-Key",
             orderServiceKey);
-    })
-    .ConfigurePrimaryHttpMessageHandler(() =>
-    {
-        return new HttpClientHandler
-        {
-            ServerCertificateCustomValidationCallback =
-                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-        };
     });
 
 var jwtSettings =

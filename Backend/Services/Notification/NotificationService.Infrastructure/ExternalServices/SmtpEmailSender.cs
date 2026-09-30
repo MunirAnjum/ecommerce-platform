@@ -1,14 +1,11 @@
-﻿using MailKit.Security;
+﻿using MailKit.Net.Smtp;
+using MailKit.Security;
+using Microsoft.Extensions.Options;
 using MimeKit;
 using NotificationService.Application.Interfaces;
 using NotificationService.Infrastructure.Configuration;
-using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using MailKit.Net.Smtp;
-using System.Text;
-using System.Threading.Tasks;
+using System.Net;
+using System.Net.Sockets;
 
 namespace NotificationService.Infrastructure.ExternalServices
 {
@@ -26,9 +23,7 @@ namespace NotificationService.Infrastructure.ExternalServices
             var email = new MimeMessage();
 
             email.From.Add(MailboxAddress.Parse(_settings.From));
-
             email.To.Add(MailboxAddress.Parse(recipient));
-
             email.Subject = subject;
 
             email.Body = new TextPart("plain")
@@ -36,11 +31,30 @@ namespace NotificationService.Infrastructure.ExternalServices
                 Text = message
             };
 
+            var addresses = await Dns.GetHostAddressesAsync(_settings.SmtpServer);
+
+            var ipv6Address = addresses.FirstOrDefault(
+                address => address.AddressFamily == AddressFamily.InterNetworkV6);
+
+            if (ipv6Address == null)
+            {
+                throw new InvalidOperationException(
+                    $"No IPv6 address found for SMTP server '{_settings.SmtpServer}'.");
+            }
+
+            using var socket = new Socket(
+                AddressFamily.InterNetworkV6,
+                SocketType.Stream,
+                ProtocolType.Tcp);
+
+            await socket.ConnectAsync(ipv6Address, _settings.Port);
+
             using var smtpClient = new SmtpClient();
 
             await smtpClient.ConnectAsync(
-                _settings.SmtpServer, 
-                _settings.Port, 
+                socket,
+                _settings.SmtpServer,
+                _settings.Port,
                 SecureSocketOptions.StartTls);
 
             await smtpClient.AuthenticateAsync(

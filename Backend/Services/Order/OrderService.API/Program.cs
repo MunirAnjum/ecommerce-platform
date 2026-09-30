@@ -95,7 +95,7 @@ builder.Services.AddHttpClient<IProductServiceClient, ProductServiceClient>(
 builder.Services.AddHttpClient<IInventoryServiceClient, InventoryServiceClient>(
     client =>
     {
-        client.BaseAddress = new 
+        client.BaseAddress = new
         Uri(builder.Configuration["Services:InventoryService"]
             ?? throw new InvalidOperationException("Inventory Service URL is not configured."));
     }

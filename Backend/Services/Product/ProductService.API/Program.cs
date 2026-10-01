@@ -1,13 +1,16 @@
-using Microsoft.EntityFrameworkCore;
-using ProductService.Infrastructure.Persistence;
-using ProductService.Application.Interfaces;
-using ProductService.Infrastructure.Repositories;
-using ProductService.Application.Services;
 using FluentValidation;
-using ProductService.Application.Validators;
-using ProductService.API.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using ProductService.API.Middleware;
+using ProductService.Application.Interfaces;
+using ProductService.Application.Services;
+using ProductService.Application.Validators;
+using ProductService.Infrastructure.Configuration;
+using ProductService.Infrastructure.Persistence;
+using ProductService.Infrastructure.Repositories;
+using ProductService.Infrastructure.Services;
+using StackExchange.Redis;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,8 +62,20 @@ builder.Services.AddScoped<IProductService, ProductService.Application.Services.
 
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 
-builder.Services.AddValidatorsFromAssemblyContaining<
-    CreateProductRequestValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
+
+builder.Services.Configure<RedisSettings>(builder.Configuration.GetSection("Redis"));
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var connectionString =
+        builder.Configuration["Redis:ConnectionString"];
+
+    return ConnectionMultiplexer.Connect(connectionString!);
+});
+
+builder.Services.AddSingleton<IRedisCacheService, RedisCacheService>();
+
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 
 var jwtKey = jwtSettings["Key"]

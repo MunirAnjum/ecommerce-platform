@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="Services/ApiGateway/ApiGateway.API/ApiGateway.API.csproj" />
   <Project Path="Services/Auth/AuthService.API/AuthService.API.csproj" Id="a13ebdee-f003-4f3e-9142-7afeb8f81bfb" />
   <Project Path="Services/Auth/AuthService.Application/AuthService.Application.csproj" Id="b54915c5-4dc1-4467-919b-6dd6b0e28a81" />
   <Project Path="Services/Auth/AuthService.Domain/AuthService.Domain.csproj" Id="cc4e07ce-697e-4c4e-ae85-72565449ab9e" />

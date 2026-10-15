@@ -1,6 +1,7 @@
 ﻿using InventoryService.Application.DTOs;
 using InventoryService.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using InventoryService.Domain.Exceptions;
 
 namespace InventoryService.API.Controllers;
 
@@ -53,9 +54,20 @@ public class InventoryController : ControllerBase
     [HttpPost("{productId:guid}/reserve")]
     public async Task<IActionResult> ReserveStock(Guid productId, ReserveStockRequest request)
     {
-        var result = await _inventoryService.ReserveStockAsync(productId, request);
+        try
+        {
+            var result = await _inventoryService.ReserveStockAsync(productId, request);
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch(InsufficientStockException ex)
+        {
+            return Conflict(new
+            {
+                statusCode = StatusCodes.Status409Conflict,
+                message = ex.Message,
+            });
+        }
     }
 
     [HttpPost("{productId:guid}/release")]

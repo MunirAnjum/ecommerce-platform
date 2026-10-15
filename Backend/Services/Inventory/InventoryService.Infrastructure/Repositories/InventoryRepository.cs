@@ -2,11 +2,6 @@
 using InventoryService.Domain.Entities;
 using InventoryService.Infrastructure.Persistences;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace InventoryService.Infrastructure.Repositories;
 public class InventoryRepository : IInventoryRepository

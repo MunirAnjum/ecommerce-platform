@@ -1,4 +1,4 @@
-﻿using System.Net;
+﻿using OrderService.Application.Exceptions;
 using System.Text.Json;
 
 namespace OrderService.API.Middleware;
@@ -44,6 +44,9 @@ public class ExceptionHandlingMiddleware
             UnauthorizedAccessException =>
                 StatusCodes.Status401Unauthorized,
 
+            InsufficientStockException =>
+                StatusCodes.Status409Conflict,
+
             InvalidOperationException =>
                 StatusCodes.Status400BadRequest,
 
@@ -51,12 +54,18 @@ public class ExceptionHandlingMiddleware
                 StatusCodes.Status500InternalServerError
         };
 
+        var message = exception switch
+        {
+            InsufficientStockException => exception.Message,
+            KeyNotFoundException => exception.Message,
+            InvalidOperationException => exception.Message,
+            _ => "An unexpected error occurred."
+        };
+
         var response = new
         {
             statusCode,
-            message = exception is KeyNotFoundException
-                ? exception.Message
-                : "An unexpected error occurred."
+            message
         };
 
         context.Response.StatusCode = statusCode;

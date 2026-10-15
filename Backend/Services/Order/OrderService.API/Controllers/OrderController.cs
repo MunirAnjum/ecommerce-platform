@@ -123,6 +123,15 @@ public class OrderController : ControllerBase
         return Ok(order);
     }
 
+    [Authorize(Policy = "InternalService")]
+    [HttpPost("internal/{id:guid}/cod-accepted")]
+    public async Task<IActionResult> AcceptCashOnDelivery(Guid id)
+    {
+        var order = await _orderService.AcceptCashOnDeliveryAsync(id);
+
+        return Ok(order);
+    }
+
     [HttpPut("{id:guid}/cancel")]
     public async Task<IActionResult> CancelAsync(Guid id)
     {

@@ -38,4 +38,13 @@ public class OrderServiceClient : IOrderServiceClient
 
         response.EnsureSuccessStatusCode();
     }
+    
+    public async Task AcceptCashOnDeliveryAsync(Guid orderId)
+    {
+        var response = await _httpClient.PostAsync(
+            $"api/order/internal/{orderId}/cod-accepted",
+            null);
+
+        response.EnsureSuccessStatusCode();
+    }
 }

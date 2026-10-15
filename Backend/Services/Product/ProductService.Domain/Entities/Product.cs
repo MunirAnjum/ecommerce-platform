@@ -15,9 +15,7 @@ public class Product
     public string Discription { get; private set; } = string.Empty;
     
     public decimal Price { get; private set; }
-    
-    public int StockQuantity { get; private set; }
-    
+        
     public bool IsActive { get; private set; }
     
     public DateTime CreateAt { get; private set; }
@@ -28,16 +26,14 @@ public class Product
     
     public Category Category { get; private set; } = null!;
 
-    public Product(string name, string discription, decimal price, int stockQuantity, Guid categoryId)
+    public Product(string name, string discription, decimal price, Guid categoryId)
     {
         Id = Guid.NewGuid();
 
         Name = name;
         Discription = discription;
         Price = price;
-        StockQuantity = stockQuantity;
         CategoryId = categoryId;
-
         IsActive = true;
         CreateAt = DateTime.UtcNow;
     }

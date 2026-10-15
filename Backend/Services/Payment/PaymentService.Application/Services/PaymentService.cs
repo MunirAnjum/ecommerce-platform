@@ -192,37 +192,38 @@ namespace PaymentService.Application.Services
                 .Select(MapToResponse)
                 .ToList();
         }
-        
+
         public async Task<PaymentResponse> ConfirmCashOnDeliveryAsync(Guid userId, Guid paymentId)
         {
             var payment = await _paymentRepository.GetByIdAsync(paymentId);
 
-            if(payment is null)
+            if (payment is null)
             {
                 throw new KeyNotFoundException("Payment not found.");
             }
 
-            if(payment.UserId != userId)
+            if (payment.UserId != userId)
             {
-                throw new InvalidOperationException("You cannot confirm this payment.");
+                throw new UnauthorizedAccessException(
+                    "You cannot select this payment.");
             }
 
-            if(payment.Method != PaymentMethod.CashOnDelivery)
+            if (payment.Method != PaymentMethod.CashOnDelivery)
             {
-                throw new InvalidOperationException("Only Cash on Delivery payments can be confirmed this way.");
+                throw new InvalidOperationException(
+                    "This payment is not Cash on Delivery.");
             }
 
             if (payment.Status != PaymentStatus.Pending)
             {
-                throw new InvalidOperationException("Only pending Cash on Delivery payments can be confirmed.");
+                throw new InvalidOperationException(
+                    "Only pending COD payments can be accepted.");
             }
 
-            payment.Complete();
+            // Accept the COD order without recording payment as received.
+            await _orderServiceClient.AcceptCashOnDeliveryAsync(payment.OrderId);
 
-            await _paymentRepository.UpdateAsync(payment);
-
-            await _orderServiceClient.ConfirmPaymentAsync(payment.OrderId);
-
+            // Payment remains Pending until cash is actually collected.
             return MapToResponse(payment);
         }
 

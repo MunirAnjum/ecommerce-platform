@@ -96,7 +96,6 @@ public class ProductService : IProductService
             request.Name,
             request.Description,
             request.Price,
-            request.StockQuantity,
             request.CategoryId
         );
 
@@ -167,7 +166,6 @@ public class ProductService : IProductService
             Name = product.Name,
             Description = product.Discription,
             Price = product.Price,
-            StockQuantity = product.StockQuantity,
             IsActive = product.IsActive,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name ?? string.Empty,

@@ -25,4 +25,6 @@ public interface IOrderService
     Task<OrderResponse> CancelAsync(Guid userId, Guid orderId, bool isAdmin);
 
     Task<OrderResponse> ConfirmPaymentAsync(Guid orderId);
+
+    Task<OrderResponse> AcceptCashOnDeliveryAsync(Guid orderId);
 }

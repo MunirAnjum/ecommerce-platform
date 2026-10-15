@@ -26,10 +26,6 @@ public class CreateProductRequestValidator : AbstractValidator<CreateProductRequ
             .GreaterThan(0)
             .WithMessage("Price must be greater than zero.");
 
-        RuleFor(x => x.StockQuantity)
-            .GreaterThanOrEqualTo(0)
-            .WithMessage("Stock quantity can not be negative.");
-
         RuleFor(x => x.CategoryId)
             .NotEmpty()
             .WithMessage("Category is required.");

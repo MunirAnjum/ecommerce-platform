@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using InventoryService.Domain.Exceptions;
 
 namespace InventoryService.Domain.Entities;
 public class InventoryItem
@@ -76,7 +72,8 @@ public class InventoryItem
 
         if (quantity > AvailableQuantity)
         {
-            throw new InvalidOperationException("Insufficient available stock.");
+            throw new InsufficientStockException(
+                $"Insufficient stock. Only {AvailableQuantity} unit(s) are available.");
         }
 
         AvailableQuantity -= quantity;

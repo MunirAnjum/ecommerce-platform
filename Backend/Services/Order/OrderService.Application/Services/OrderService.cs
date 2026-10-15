@@ -84,53 +84,84 @@ public class OrderService : IOrderService
             orderItems.Add(orderItem);
         }
 
-        foreach(var item in orderItems)
+        Order? order = null;
+        var reservedItems = new List<OrderItem>();
+
+        try
         {
-            await _inventoryServiceClient.ReserveStockAsync(item.ProductId, item.Quantity);
+            foreach (var item in orderItems)
+            {
+                await _inventoryServiceClient.ReserveStockAsync(
+                    item.ProductId,
+                    item.Quantity);
+
+                reservedItems.Add(item);
+            }
+
+            var totalAmount = orderItems.Sum(x => x.TotalPrice);
+
+            order = new Order(
+                userId,
+                totalAmount);
+
+            foreach (var item in orderItems)
+            {
+                item.SetOrderId(order.Id);
+
+                order.Items.Add(item);
+            }
+
+            var orderCreatedEvent = new OrderCreatedEvent
+            {
+                OrderId = order.Id,
+                UserId = order.UserId,
+                TotalAmount = order.TotalAmount,
+                Recipient = "muniranjum96@gmail.com"
+            };
+
+            var payload = JsonSerializer.Serialize(orderCreatedEvent);
+
+            var outboxMessage = new OutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                EventType = nameof(OrderCreatedEvent),
+                RoutingKey = "order.created",
+                Payload = payload,
+                OccurredOnUtc = DateTime.UtcNow
+            };
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                await _orderRepository.AddAsync(order);
+
+                await _outboxRepository.AddAsync(outboxMessage);
+
+                await _cartRepository.ClearItemsAsync(cart.Id);
+            });
+        }
+        catch
+        {
+            foreach (var item in reservedItems)
+            {
+                try
+                {
+                    await _inventoryServiceClient.ReleaseStockAsync(
+                        item.ProductId,
+                        item.Quantity);
+                }
+                catch (Exception releaseError)
+                {
+                    // Replace with your application's ILogger logging.
+                    Console.Error.WriteLine(
+                        $"Stock compensation failed for product " +
+                        $"{item.ProductId}: {releaseError.Message}");
+                }
+            }
+
+            throw;
         }
 
-        var totalAmount = orderItems.Sum(x => x.TotalPrice);
-
-        var order = new Order(
-            userId,
-            totalAmount);
-
-        foreach (var item in orderItems)
-        {
-            item.SetOrderId(order.Id);
-
-            order.Items.Add(item);
-        }
-
-        await _cartRepository.ClearItemsAsync(cart.Id);
-
-        var orderCreatedEvent = new OrderCreatedEvent
-        {
-            OrderId = order.Id,
-            UserId = order.UserId,
-            TotalAmount = order.TotalAmount,
-            Recipient = "muniranjum96@gmail.com"
-        };
-
-        var payload = JsonSerializer.Serialize(orderCreatedEvent);
-
-        var outboxMessage = new OutboxMessage
-        {
-            Id = Guid.NewGuid(),
-            EventType = nameof(OrderCreatedEvent),
-            RoutingKey = "order.created",
-            Payload = payload,
-            OccurredOnUtc = DateTime.UtcNow
-        };
-
-        await _unitOfWork.ExecuteInTransactionAsync(async () =>
-        {
-            await _orderRepository.AddAsync(order);
-
-            await _outboxRepository.AddAsync(outboxMessage);
-        });
-
-        return MapToResponse(order);
+        return MapToResponse(order!);
     }
 
     public async Task<OrderResponse> GetByIdAsync(
@@ -188,7 +219,10 @@ public class OrderService : IOrderService
         return MapToResponse(order);
     }
 
-    public async Task<OrderResponse> CancelAsync(Guid userId, Guid orderId, bool isAdmin)
+    public async Task<OrderResponse> CancelAsync(
+    Guid userId,
+    Guid orderId,
+    bool isAdmin)
     {
         var order = await _orderRepository.GetByIdAsync(orderId);
 
@@ -203,24 +237,17 @@ public class OrderService : IOrderService
                 "You cannot access this order.");
         }
 
-        if (order.Status == OrderStatus.Pending)
-        {
-            // Inventory is still reserved.
-            foreach (var item in order.Items)
-            {
-                await _inventoryServiceClient.ReleaseStockAsync(
-                    item.ProductId,
-                    item.Quantity);
-            }
-        }
-        else if (order.Status == OrderStatus.Confirmed)
-        {
-            // Inventory was already confirmed/consumed.
-        }
-        else
+        if (order.Status != OrderStatus.Pending)
         {
             throw new InvalidOperationException(
-                "Only pending or confirmed orders can be cancelled.");
+                "Only pending orders can be cancelled.");
+        }
+
+        foreach (var item in order.Items)
+        {
+            await _inventoryServiceClient.ReleaseStockAsync(
+                item.ProductId,
+                item.Quantity);
         }
 
         order.Cancel();
@@ -369,6 +396,36 @@ public class OrderService : IOrderService
         await _orderRepository.UpdateAsync(order);
 
         return MapToResponse(order);
+    }
+
+
+    public async Task<OrderResponse> AcceptCashOnDeliveryAsync(Guid orderId)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId);
+
+        if (order is not null)
+        {
+            if (order.Status != OrderStatus.Pending)
+            {
+                throw new InvalidOperationException(
+                    "Only pending orders can be accepted for Cash on Delivery.");
+            }
+                
+            foreach (var item in order.Items)
+            {
+                await _inventoryServiceClient.ConfirmStockAsync(
+                    item.ProductId,
+                    item.Quantity);
+            }
+
+            order.Confirm();
+
+            await _orderRepository.UpdateAsync(order);
+
+            return MapToResponse(order);
+        }
+
+        throw new KeyNotFoundException("Order not found.");
     }
 
     private static OrderResponse MapToResponse(

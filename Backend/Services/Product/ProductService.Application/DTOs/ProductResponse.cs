@@ -16,8 +16,6 @@ public class ProductResponse
 
     public decimal Price { get; set; }
 
-    public int StockQuantity { get; set; }
-
     public bool IsActive { get; set; }
 
     public Guid CategoryId { get; set; }

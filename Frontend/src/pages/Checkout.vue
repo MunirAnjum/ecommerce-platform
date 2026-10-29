@@ -22,8 +22,11 @@ import {
 } from '../services/paymentService'
 import { formatPrice } from '../utils/formatters'
 import { getProductImageUrl } from '../utils/productImages'
+import { getProducts } from '../services/productService'
+import type { Product } from '../types/productType'
 
 const cartStore = useCartStore()
+const productMap = ref<Record<string, Product>>({})
 
 const isLoading = ref(true)
 const isSubmitting = ref(false)
@@ -40,7 +43,13 @@ const paymentId = ref<string | null>(null)
 
 onMounted(async () => {
   try {
-    await cartStore.loadCart()
+    const [prods] = await Promise.all([
+      getProducts().catch(() => [] as Product[]),
+      cartStore.loadCart(),
+    ])
+    prods.forEach(p => {
+      productMap.value[p.id] = p
+    })
   } catch (error) {
     console.error('Failed to load cart:', error)
     errorMessage.value = 'Unable to load your cart. Please try again.'
@@ -375,7 +384,7 @@ async function PlaceOrder() {
             >
               <div class="flex items-center gap-3 min-w-0">
                 <img
-                  :src="getProductImageUrl(item.productName)"
+                  :src="getProductImageUrl(productMap[item.productId] || item.productName)"
                   :alt="item.productName"
                   class="h-12 w-12 rounded-xl object-cover bg-stone-100 shrink-0"
                 />

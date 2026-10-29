@@ -1,3 +1,4 @@
+
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import {
@@ -19,6 +20,8 @@ import type { Product } from '../types/productType'
 import StatusBadge from '../components/StatusBadge.vue'
 import Modal from '../components/Modal.vue'
 
+type WeightUnit = 'g' | 'kg'
+
 const inventories = ref<InventoryResponse[]>([])
 const products = ref<Product[]>([])
 const isLoading = ref(true)
@@ -26,19 +29,20 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const searchQuery = ref('')
 
-// Add stock modal
+// Restock modal
 const isAddStockModalOpen = ref(false)
 const selectedInventory = ref<InventoryResponse | null>(null)
-const stockToAdd = ref<number | ''>('')
+const stockToAdd = ref<number | ''>(1)
+const stockUnit = ref<WeightUnit>('kg')
 const isAddingStock = ref(false)
 
 // Initialize inventory modal
 const isInitModalOpen = ref(false)
 const selectedProductIdForInit = ref('')
-const initialQuantity = ref<number | ''>(50)
+const initialQuantity = ref<number | ''>(0)
+const initialUnit = ref<WeightUnit>('kg')
 const isInitializing = ref(false)
 
-// Combined display row
 interface InventoryDisplayRow {
   productId: string
   productName: string
@@ -52,15 +56,16 @@ interface InventoryDisplayRow {
 
 const inventoryRows = computed<InventoryDisplayRow[]>(() => {
   const invMap = new Map<string, InventoryResponse>()
+
   inventories.value.forEach(inv => {
     invMap.set(inv.productId, inv)
   })
 
   const rows: InventoryDisplayRow[] = []
 
-  // Add all products with their inventory state
   products.value.forEach(prod => {
     const inv = invMap.get(prod.id)
+
     rows.push({
       productId: prod.id,
       productName: prod.name,
@@ -68,14 +73,15 @@ const inventoryRows = computed<InventoryDisplayRow[]>(() => {
       price: prod.price,
       inventoryId: inv?.id,
       availableQuantity: inv ? inv.availableQuantity : 0,
-      reservedQuantity: inv?.reservedQuantity || 0,
+      reservedQuantity: inv?.reservedQuantity ?? 0,
       hasInventoryRecord: !!inv,
     })
   })
 
-  // Filter
   const q = searchQuery.value.trim().toLowerCase()
+
   if (!q) return rows
+
   return rows.filter(
     r =>
       r.productName.toLowerCase().includes(q) ||
@@ -89,6 +95,48 @@ const uninitializedProducts = computed(() => {
   return products.value.filter(p => !invProductIds.has(p.id))
 })
 
+/**
+ * Convert an admin-entered amount to integer grams.
+ * Returns null if the value is invalid or cannot be represented
+ * as a whole number of grams.
+ */
+function toGrams(
+  amount: number | '',
+  unit: WeightUnit,
+  allowZero = false
+): number | null {
+  if (amount === '' || !Number.isFinite(Number(amount))) {
+    return null
+  }
+
+  const value = Number(amount)
+
+  if (allowZero ? value < 0 : value <= 0) {
+    return null
+  }
+
+  if (unit === 'g' && !Number.isInteger(value)) {
+    return null
+  }
+
+  const grams = unit === 'kg' ? value * 1000 : value
+
+  if (!Number.isSafeInteger(grams)) {
+    return null
+  }
+
+  return grams
+}
+
+/** Format integer grams for display, e.g. 1250 -> 1.25 kg. */
+function formatWeight(grams: number): string {
+  if (grams >= 1000) {
+    return `${Number((grams / 1000).toFixed(3))} kg`
+  }
+
+  return `${grams} g`
+}
+
 async function loadData() {
   isLoading.value = true
   errorMessage.value = ''
@@ -98,11 +146,13 @@ async function loadData() {
       getAllInventory(),
       getProducts(),
     ])
+
     inventories.value = invList
     products.value = prodList
   } catch (error) {
     console.error('Failed to load inventory data:', error)
-    errorMessage.value = 'Failed to load stock data from Inventory microservice.'
+    errorMessage.value =
+      'Failed to load stock data from Inventory microservice.'
   } finally {
     isLoading.value = false
   }
@@ -115,13 +165,24 @@ function openAddStockModal(row: InventoryDisplayRow) {
     availableQuantity: row.availableQuantity,
     reservedQuantity: row.reservedQuantity,
   }
-  stockToAdd.value = 25
+
+  stockToAdd.value = 1
+  stockUnit.value = 'kg'
+  errorMessage.value = ''
   isAddStockModalOpen.value = true
 }
 
 async function handleAddStock() {
-  if (!selectedInventory.value || stockToAdd.value === '' || Number(stockToAdd.value) <= 0) {
-    errorMessage.value = 'Please specify a valid positive quantity to add.'
+  if (!selectedInventory.value) {
+    errorMessage.value = 'Please select a product to restock.'
+    return
+  }
+
+  const quantityInGrams = toGrams(stockToAdd.value, stockUnit.value)
+
+  if (quantityInGrams === null) {
+    errorMessage.value =
+      'Enter a valid positive weight. Grams must be whole numbers, and kilograms can have up to three decimal places.'
     return
   }
 
@@ -130,13 +191,22 @@ async function handleAddStock() {
   successMessage.value = ''
 
   try {
-    await addStock(selectedInventory.value.productId, Number(stockToAdd.value))
-    successMessage.value = `Successfully added ${stockToAdd.value} units to stock.`
+    await addStock(
+      selectedInventory.value.productId,
+      quantityInGrams
+    )
+
+    successMessage.value =
+      `Successfully added ${formatWeight(quantityInGrams)} to stock.`
+
     isAddStockModalOpen.value = false
     await loadData()
   } catch (error: any) {
     console.error('Failed to add stock:', error)
-    errorMessage.value = error.response?.data?.message || 'Could not update stock quantity in Inventory Service.'
+
+    errorMessage.value =
+      error.response?.data?.message ||
+      'Could not update stock quantity in Inventory Service.'
   } finally {
     isAddingStock.value = false
   }
@@ -146,13 +216,28 @@ function openInitModal() {
   if (uninitializedProducts.value.length > 0) {
     selectedProductIdForInit.value = uninitializedProducts.value[0].id
   }
-  initialQuantity.value = 50
+
+  initialQuantity.value = 0
+  initialUnit.value = 'kg'
+  errorMessage.value = ''
   isInitModalOpen.value = true
 }
 
 async function handleInitInventory() {
-  if (!selectedProductIdForInit.value || initialQuantity.value === '' || Number(initialQuantity.value) < 0) {
-    errorMessage.value = 'Please select a product and valid initial quantity.'
+  if (!selectedProductIdForInit.value) {
+    errorMessage.value = 'Please select a product.'
+    return
+  }
+
+  const initialQuantityInGrams = toGrams(
+    initialQuantity.value,
+    initialUnit.value,
+    true
+  )
+
+  if (initialQuantityInGrams === null) {
+    errorMessage.value =
+      'Enter a valid initial weight. Grams must be whole numbers, and kilograms can have up to three decimal places.'
     return
   }
 
@@ -163,14 +248,20 @@ async function handleInitInventory() {
   try {
     await createInventory({
       productId: selectedProductIdForInit.value,
-      initialQuantity: Number(initialQuantity.value),
+      initialQuantity: initialQuantityInGrams,
     })
-    successMessage.value = 'Inventory record successfully created for the harvest product.'
+
+    successMessage.value =
+      `Inventory record created with ${formatWeight(initialQuantityInGrams)} of initial stock.`
+
     isInitModalOpen.value = false
     await loadData()
   } catch (error: any) {
     console.error('Failed to create inventory:', error)
-    errorMessage.value = error.response?.data?.message || 'Failed to initialize inventory record.'
+
+    errorMessage.value =
+      error.response?.data?.message ||
+      'Failed to initialize inventory record.'
   } finally {
     isInitializing.value = false
   }
@@ -178,6 +269,7 @@ async function handleInitInventory() {
 
 onMounted(loadData)
 </script>
+
 
 <template>
   <div class="space-y-6">
@@ -188,7 +280,7 @@ onMounted(loadData)
           Inventory & Warehouse Management
         </h2>
         <p class="mt-1 text-xs text-stone-500">
-          Track warehouse reserve quotas, available packs, and replenish dry fruit stock.
+          Track available and reserved warehouse weight in grams and kilograms.
         </p>
       </div>
 
@@ -263,8 +355,8 @@ onMounted(loadData)
             <tr class="border-b border-stone-200 bg-stone-50/80 font-bold uppercase tracking-wider text-stone-500">
               <th class="px-6 py-4">Product Name</th>
               <th class="px-6 py-4">Status</th>
-              <th class="px-6 py-4 text-center">Available Units</th>
-              <th class="px-6 py-4 text-center">Reserved Units</th>
+              <th class="px-6 py-4 text-center">Available Weight</th>
+              <th class="px-6 py-4 text-center">Reserved Weight</th>
               <th class="px-6 py-4 text-right">Stock Action</th>
             </tr>
           </thead>
@@ -292,10 +384,10 @@ onMounted(loadData)
                 </span>
               </td>
               <td class="px-6 py-4 text-center font-bold text-sm text-stone-900">
-                {{ row.availableQuantity }}
+                {{ formatWeight(row.availableQuantity) }}
               </td>
               <td class="px-6 py-4 text-center text-stone-500 font-mono">
-                {{ row.reservedQuantity }}
+                {{ formatWeight(row.reservedQuantity) }}
               </td>
               <td class="px-6 py-4 text-right">
                 <button
@@ -335,16 +427,31 @@ onMounted(loadData)
 
         <div>
           <label class="block text-xs font-bold uppercase tracking-wider text-stone-700">
-            Quantity to Add
+            Weight to Add
           </label>
-          <input
-            v-model.number="stockToAdd"
-            type="number"
-            min="1"
-            step="1"
-            required
-            class="mt-1.5 w-full rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-2.5 text-sm text-stone-900 focus:border-amber-700 focus:bg-white focus:outline-none"
-          />
+
+          <div class="mt-1.5 flex gap-3">
+            <input
+              v-model.number="stockToAdd"
+              type="number"
+              min="0.001"
+              :step="stockUnit === 'kg' ? '0.001' : '1'"
+              required
+              class="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-2.5 text-sm text-stone-900 focus:border-amber-700 focus:bg-white focus:outline-none"
+            />
+
+            <select
+              v-model="stockUnit"
+              class="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 focus:border-amber-700 focus:outline-none"
+            >
+              <option value="kg">kg</option>
+              <option value="g">g</option>
+            </select>
+          </div>
+
+          <p class="mt-2 text-xs text-stone-500">
+            Enter the bulk weight being added to the warehouse.
+          </p>
         </div>
       </div>
 
@@ -396,15 +503,31 @@ onMounted(loadData)
 
         <div>
           <label class="block text-xs font-bold uppercase tracking-wider text-stone-700">
-            Initial Warehouse Packs
+            Initial Warehouse Weight
           </label>
-          <input
-            v-model.number="initialQuantity"
-            type="number"
-            min="0"
-            step="1"
-            class="mt-1.5 w-full rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-2.5 text-sm text-stone-900 focus:border-amber-700 focus:bg-white focus:outline-none"
-          />
+
+          <div class="mt-1.5 flex gap-3">
+            <input
+              v-model.number="initialQuantity"
+              type="number"
+              min="0"
+              :step="initialUnit === 'kg' ? '0.001' : '1'"
+              required
+              class="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-2.5 text-sm text-stone-900 focus:border-amber-700 focus:bg-white focus:outline-none"
+            />
+
+            <select
+              v-model="initialUnit"
+              class="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 focus:border-amber-700 focus:outline-none"
+            >
+              <option value="kg">kg</option>
+              <option value="g">g</option>
+            </select>
+          </div>
+
+          <p class="mt-2 text-xs text-stone-500">
+            Enter the total bulk weight currently held in the warehouse. Zero is allowed.
+          </p>
         </div>
       </div>
 

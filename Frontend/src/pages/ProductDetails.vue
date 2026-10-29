@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ShoppingBag,
-  CheckCircle2,
   AlertCircle,
   Sun,
   ShieldCheck,
@@ -37,7 +36,20 @@ const cartMessage = ref('')
 const isSuccess = ref(false)
 const isAdding = ref(false)
 const quantity = ref(1)
+const selectedWeight = ref(250)
 const imgError = ref(false)
+
+const weightOptions = [
+  { label: '250g', value: 250 },
+  { label: '500g', value: 500 },
+  { label: '1kg', value: 1000 },
+]
+
+const selectedPrice = computed(() => {
+  if (!product.value) return 0
+
+  return product.value.price * (selectedWeight.value / 250)
+})
 
 async function loadProduct() {
   const id = route.params.id as string
@@ -49,6 +61,7 @@ async function loadProduct() {
   cartMessage.value = ''
   imgError.value = false
   quantity.value = 1
+  selectedWeight.value = 250
 
   try {
     const data = await getProductById(id)
@@ -113,20 +126,27 @@ async function handleAddToCart() {
   isAdding.value = true
   cartMessage.value = ''
 
-  try {
-    // Add item to cart with selected quantity
-    for (let i = 0; i < quantity.value; i++) {
-      await cartStore.addToCart(product.value.id)
-    }
-    cartMessage.value = `Added ${quantity.value} item(s) to your shopping cart.`
-    isSuccess.value = true
-  } catch (error) {
-    console.error('Cart add failed:', error)
-    cartMessage.value = 'Could not add product to cart. Please try again.'
-    isSuccess.value = false
-  } finally {
-    isAdding.value = false
-  }
+ try {
+  await cartStore.addToCart(
+    product.value.id,
+    selectedWeight.value,
+    quantity.value,
+  )
+
+  cartMessage.value =
+    `Added ${quantity.value} × ${weightOptions.find(
+      option => option.value === selectedWeight.value,
+    )?.label} to your shopping cart.`
+
+  isSuccess.value = true
+} catch (error) {
+  console.error('Cart add failed:', error)
+  cartMessage.value =
+    'Could not add product to cart. Please try again.'
+  isSuccess.value = false
+} finally {
+  isAdding.value = false
+}
 }
 
 watch(() => route.params.id, () => {
@@ -182,9 +202,9 @@ onMounted(loadProduct)
         <!-- Product Visual Showcase -->
         <div class="relative overflow-hidden rounded-3xl border border-stone-200 bg-stone-100 shadow-md">
           <img
-            :src="imgError ? DEFAULT_PRODUCT_FALLBACK : getProductImageUrl(product.name, product.categoryName, undefined, product.id)"
+            :src="imgError ? DEFAULT_PRODUCT_FALLBACK : getProductImageUrl(product)"
             :alt="product.name"
-            class="h-full w-full object-cover max-h-[520px]"
+            class="h-full w-full object-cover max-h-[790px]"
             @error="imgError = true"
           />
 
@@ -206,10 +226,15 @@ onMounted(loadProduct)
             {{ product.name }}
           </h1>
 
-          <div class="mt-4 flex items-baseline gap-3">
+          <div class="mt-4 flex flex-wrap items-baseline gap-3">
             <span class="text-3xl font-extrabold text-stone-900">
-              {{ formatPrice(product.price) }}
+              {{ formatPrice(selectedPrice) }}
             </span>
+
+            <span class="text-sm font-semibold text-stone-500">
+              / {{ weightOptions.find(option => option.value === selectedWeight)?.label }}
+            </span>
+
             <span class="text-xs font-semibold uppercase text-stone-500">
               Tax Included
             </span>
@@ -241,19 +266,48 @@ onMounted(loadProduct)
               Currently Sold Out — Fresh batch arriving with next shipment
             </div>
 
-            <div
+            <!-- <div
               v-else-if="availableQuantity !== null"
               class="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold"
               :class="availableQuantity <= 5 ? 'bg-amber-50 border border-amber-200 text-amber-800' : 'bg-emerald-50 border border-emerald-200 text-emerald-800'"
             >
               <CheckCircle2 class="h-4 w-4" />
               In Stock: {{ availableQuantity }} packs available
-            </div>
+            </div> -->
           </div>
 
           <!-- Quantity Stepper & Add to Cart -->
           <div class="mt-8 space-y-4">
             <div class="flex items-center gap-4">
+              <!-- Package Weight Selection -->
+              <div class="space-y-3">
+                <span class="block text-xs font-bold uppercase tracking-wider text-stone-500">
+                  Select Weight
+                </span>
+
+                <div class="grid grid-cols-3 gap-3">
+                  <button
+                    v-for="option in weightOptions"
+                    :key="option.value"
+                    type="button"
+                    class="rounded-xl border px-4 py-3 text-sm font-bold transition"
+                    :class="
+                      selectedWeight === option.value
+                        ? 'border-emerald-800 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-800'
+                        : 'border-stone-200 bg-white text-stone-700 hover:border-stone-400'
+                    "
+                    :aria-pressed="selectedWeight === option.value"
+                    @click="selectedWeight = option.value"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
+
+                <p class="text-xs text-stone-500">
+                  Price shown is for the selected package weight.
+                </p>
+              </div>
+
               <span class="text-xs font-bold uppercase text-stone-500">Quantity</span>
 
               <div class="flex items-center rounded-2xl border border-stone-200 bg-white shadow-2xs">

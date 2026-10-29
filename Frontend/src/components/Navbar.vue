@@ -79,6 +79,22 @@ function closeMobileMenu() {
         </router-link>
 
         <router-link
+          to="/dry-fruits"
+          class="transition hover:text-emerald-800"
+          active-class="text-emerald-800 font-bold"
+        >
+          Dry Fruits
+        </router-link>
+
+        <router-link
+          to="/nuts"
+          class="transition hover:text-emerald-800"
+          active-class="text-emerald-800 font-bold"
+        >
+          Nuts
+        </router-link>
+
+        <router-link
           to="/products"
           class="transition hover:text-emerald-800"
           active-class="text-emerald-800 font-bold"
@@ -217,6 +233,24 @@ function closeMobileMenu() {
           @click="closeMobileMenu"
         >
           <span>Home</span>
+          <span class="text-stone-400">→</span>
+        </router-link>
+
+        <router-link
+          to="/dry-fruits"
+          class="flex items-center justify-between py-2 border-b border-stone-200/60"
+          @click="closeMobileMenu"
+        >
+          <span>Dry Fruits</span>
+          <span class="text-stone-400">→</span>
+        </router-link>
+
+        <router-link
+          to="/nuts"
+          class="flex items-center justify-between py-2 border-b border-stone-200/60"
+          @click="closeMobileMenu"
+        >
+          <span>Nuts</span>
           <span class="text-stone-400">→</span>
         </router-link>
 

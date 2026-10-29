@@ -1,140 +1,34 @@
 /**
- * Product & Category image resolver with authentic Baltistan dry fruit photography,
- * persistent local storage image registry, and graceful fallback handling.
+ * Product & Category image resolver for Karakoram Harvest.
+ * Uses persistent Cloudinary URLs with verified local image fallbacks.
  */
 
-// Curated high-resolution imagery for real dry fruits
-const FRUIT_IMAGE_MAP: Record<string, string> = {
-  // Apricot & derivatives
-  apricot: 'https://images.unsplash.com/photo-1595231712325-9fcca684346e?auto=format&fit=crop&w=800&q=80',
-  appricot: 'https://images.unsplash.com/photo-1595231712325-9fcca684346e?auto=format&fit=crop&w=800&q=80',
-  khubani: 'https://images.unsplash.com/photo-1595231712325-9fcca684346e?auto=format&fit=crop&w=800&q=80',
-  halman: 'https://images.unsplash.com/photo-1595231712325-9fcca684346e?auto=format&fit=crop&w=800&q=80',
-
-  // Walnuts
-  walnut: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?auto=format&fit=crop&w=800&q=80',
-  akhrot: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?auto=format&fit=crop&w=800&q=80',
-  kagzi: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?auto=format&fit=crop&w=800&q=80',
-
-  // Almonds
-  almond: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?auto=format&fit=crop&w=800&q=80',
-  badam: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?auto=format&fit=crop&w=800&q=80',
-  giri: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?auto=format&fit=crop&w=800&q=80',
-
-  // Pine nuts / Chilgoza
-  pine: 'https://images.unsplash.com/photo-1577968897966-3d4325b36b61?auto=format&fit=crop&w=800&q=80',
-  chilgoza: 'https://images.unsplash.com/photo-1577968897966-3d4325b36b61?auto=format&fit=crop&w=800&q=80',
-
-  // Mulberry
-  mulberry: 'https://images.unsplash.com/photo-1596797882870-8c33deeac224?auto=format&fit=crop&w=800&q=80',
-  shehtoot: 'https://images.unsplash.com/photo-1596797882870-8c33deeac224?auto=format&fit=crop&w=800&q=80',
-  shahtoot: 'https://images.unsplash.com/photo-1596797882870-8c33deeac224?auto=format&fit=crop&w=800&q=80',
-  tut: 'https://images.unsplash.com/photo-1596797882870-8c33deeac224?auto=format&fit=crop&w=800&q=80',
-
-  // Figs
-  fig: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=800&q=80',
-  injeer: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=800&q=80',
-
-  // Raisins
-  raisin: 'https://images.unsplash.com/photo-1589135233689-d56b4f74eeeb?auto=format&fit=crop&w=800&q=80',
-  kishmish: 'https://images.unsplash.com/photo-1589135233689-d56b4f74eeeb?auto=format&fit=crop&w=800&q=80',
-  sundarkhani: 'https://images.unsplash.com/photo-1589135233689-d56b4f74eeeb?auto=format&fit=crop&w=800&q=80',
-
-  // Pistachios
-  pistachio: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=800&q=80',
-  pista: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=800&q=80',
-
-  // Mixed / Default
-  mix: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?auto=format&fit=crop&w=800&q=80',
-  dry: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?auto=format&fit=crop&w=800&q=80',
-}
-
-export const DEFAULT_PRODUCT_FALLBACK =
-  'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?auto=format&fit=crop&w=800&q=80'
-
-const PRODUCT_IMAGES_STORAGE_KEY = 'karakoram_product_custom_images'
+export const DEFAULT_PRODUCT_FALLBACK = '/images/dry_fruits.jpg'
 
 /**
- * Returns dictionary of custom product images persisted in localStorage.
- */
-export function getCustomImagesRegistry(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(PRODUCT_IMAGES_STORAGE_KEY)
-    if (raw) {
-      return JSON.parse(raw)
-    }
-  } catch (err) {
-    console.error('Failed to parse product custom images from localStorage:', err)
-  }
-  return {}
-}
-
-/**
- * Persists a custom image (DataURL or URL) for a product ID in browser storage.
- */
-export function saveProductCustomImage(productId: string, imageDataUrlOrUrl: string): void {
-  try {
-    const registry = getCustomImagesRegistry()
-    registry[productId] = imageDataUrlOrUrl
-    localStorage.setItem(PRODUCT_IMAGES_STORAGE_KEY, JSON.stringify(registry))
-    window.dispatchEvent(new CustomEvent('product-images-updated', { detail: { productId } }))
-  } catch (err) {
-    console.error('Failed to save product custom image:', err)
-  }
-}
-
-/**
- * Removes custom persisted image for a product.
- */
-export function removeProductCustomImage(productId: string): void {
-  try {
-    const registry = getCustomImagesRegistry()
-    if (registry[productId]) {
-      delete registry[productId]
-      localStorage.setItem(PRODUCT_IMAGES_STORAGE_KEY, JSON.stringify(registry))
-      window.dispatchEvent(new CustomEvent('product-images-updated', { detail: { productId } }))
-    }
-  } catch (err) {
-    console.error('Failed to remove product custom image:', err)
-  }
-}
-
-/**
- * Retrieves the custom image for a given product ID if one exists.
- */
-export function getProductCustomImage(productId?: string): string | null {
-  if (!productId) return null
-  const registry = getCustomImagesRegistry()
-  return registry[productId] || null
-}
-
-/**
- * Resolves the appropriate product image URL based on custom uploaded image,
- * backend explicit URL, or authentic Baltistan photography fallback.
+ * Resolves the display image URL for a product.
+ * Returns the Cloudinary secure URL if present, otherwise returns the verified local fallback.
  */
 export function getProductImageUrl(
-  name?: string,
-  categoryName?: string,
-  explicitUrl?: string,
-  productId?: string
+  targetOrUrl?: string | { imageUrl?: string | null; name?: string } | null,
+  _categoryName?: string,
+  _explicitUrl?: string,
+  _productId?: string
 ): string {
-  // 1. Explicit URL from caller or backend
-  if (explicitUrl && explicitUrl.trim().length > 0) {
-    return explicitUrl
+  // If a product object was provided
+  if (targetOrUrl && typeof targetOrUrl === 'object') {
+    if (targetOrUrl.imageUrl && targetOrUrl.imageUrl.trim().length > 0) {
+      return targetOrUrl.imageUrl.trim()
+    }
+    return DEFAULT_PRODUCT_FALLBACK
   }
 
-  // 2. Custom image persisted locally by product ID
-  if (productId) {
-    const custom = getProductCustomImage(productId)
-    if (custom) return custom
-  }
-
-  // 3. Match against authentic photo keywords
-  const searchTarget = `${name ?? ''} ${categoryName ?? ''}`.toLowerCase()
-
-  for (const [key, url] of Object.entries(FRUIT_IMAGE_MAP)) {
-    if (searchTarget.includes(key)) {
-      return url
+  // If a string was provided
+  if (typeof targetOrUrl === 'string' && targetOrUrl.trim().length > 0) {
+    const trimmed = targetOrUrl.trim()
+    // Check if it's already a full URL or absolute path
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+      return trimmed
     }
   }
 
@@ -142,45 +36,51 @@ export function getProductImageUrl(
 }
 
 /**
- * Resolves an authentic hero image for category cards.
+ * Resolves an authentic hero image for category cards using local verified assets.
  */
 export function getCategoryImageUrl(categoryName?: string): string {
   if (!categoryName) return DEFAULT_PRODUCT_FALLBACK
   const name = categoryName.toLowerCase()
+
   if (
     name.includes('apricot') ||
     name.includes('appricot') ||
     name.includes('khubani') ||
     name.includes('halman')
   ) {
-    return FRUIT_IMAGE_MAP.apricot
+    return '/images/Apricot.jpg'
   }
   if (name.includes('walnut') || name.includes('akhrot') || name.includes('kagzi')) {
-    return FRUIT_IMAGE_MAP.walnut
+    return '/images/Walnut.jpg'
   }
   if (name.includes('almond') || name.includes('badam') || name.includes('giri')) {
-    return FRUIT_IMAGE_MAP.almond
+    return '/images/Almond.jpg'
   }
-  if (name.includes('pine') || name.includes('chilgoza')) {
-    return FRUIT_IMAGE_MAP.chilgoza
+  if (name.includes('oleaster') || name.includes('rassian olive') || name.includes('gold berry')) {
+    return '/images/mulberries.jpg'
+  }
+  if (name.includes('date') || name.includes('dates') || name.includes('khajoor') || name.includes('khajur')) {
+    return '/images/dates.jpg'
+  }
+  if (name.includes('raisins') || name.includes('kishmis') || name.includes('dried raisins')) {
+    return '/images/raisins.jpg'
+  }
+  if (name.includes('pistachio') || name.includes('pistachios') || name.includes('pista')) {
+    return '/images/pistachio.jpg'
+  }
+  if (name.includes('cashew') || name.includes('cashews') || name.includes('kaju')) {
+    return '/images/cashews.jpg'
+  }
+  if (name.includes('figs') || name.includes('fig') || name.includes('injeer')) {
+    return '/images/figs.jpg'
   }
   if (
-    name.includes('mulberry') ||
-    name.includes('shehtoot') ||
-    name.includes('shahtoot') ||
-    name.includes('tut')
+    name.includes('mulberry') || name.includes('shehtoot') || name.includes('shahtoot') || name.includes('tut') ||
+    name.includes('bidana')
   ) {
-    return FRUIT_IMAGE_MAP.mulberry
+    return '/images/Bidana mulberries.jpg'
   }
-  if (name.includes('fig') || name.includes('injeer')) {
-    return FRUIT_IMAGE_MAP.fig
-  }
-  if (name.includes('raisin') || name.includes('kishmish')) {
-    return FRUIT_IMAGE_MAP.raisin
-  }
-  if (name.includes('pistachio') || name.includes('pista')) {
-    return FRUIT_IMAGE_MAP.pistachio
-  }
+
   return DEFAULT_PRODUCT_FALLBACK
 }
 

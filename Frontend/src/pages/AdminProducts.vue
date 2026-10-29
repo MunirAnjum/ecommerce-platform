@@ -11,23 +11,20 @@ import {
   CheckCircle2,
   UploadCloud,
   X,
+  Loader2,
 } from 'lucide-vue-next'
 import {
   getProducts,
   createProduct,
   updateProduct,
   deleteProduct,
+  uploadProductImage,
 } from '../services/productService'
 import { getCategories } from '../services/categoryService'
 import type { CreateProductRequest, Product, UpdateProductRequest } from '../types/productType'
 import type { CategoryResponse } from '../types/categoryType'
 import { formatPrice } from '../utils/formatters'
-import {
-  getProductImageUrl,
-  getProductCustomImage,
-  saveProductCustomImage,
-  removeProductCustomImage,
-} from '../utils/productImages'
+import { getProductImageUrl } from '../utils/productImages'
 import Modal from '../components/Modal.vue'
 
 const products = ref<Product[]>([])
@@ -40,6 +37,7 @@ const searchQuery = ref('')
 // Create / Edit modal state
 const isFormModalOpen = ref(false)
 const isSubmitting = ref(false)
+const isUploadingImage = ref(false)
 const editingProduct = ref<Product | null>(null)
 
 // Form fields
@@ -49,13 +47,15 @@ const formPrice = ref<number | ''>('')
 const formCategoryId = ref('')
 const formIsActive = ref(true)
 
-// Custom image state
+// Image upload state
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const selectedFile = ref<File | null>(null)
 const previewImageUrl = ref<string | null>(null)
 const imageFileName = ref<string>('')
 const imageError = ref<string>('')
 const isDragging = ref(false)
 const imageWasModified = ref(false)
+const imageWasCleared = ref(false)
 
 // Delete modal state
 const isDeleteModalOpen = ref(false)
@@ -94,30 +94,25 @@ async function loadData() {
 function processImageFile(file: File) {
   imageError.value = ''
 
-  // Validate type
+  // Validate format
   const validTypes = ['image/jpeg', 'image/png', 'image/webp']
   if (!validTypes.includes(file.type)) {
     imageError.value = 'Invalid format. Only JPEG, PNG, and WebP images are supported.'
     return
   }
 
-  // Validate size (< 800KB)
-  const maxSize = 1500 * 1024
+  // Validate size (< 5 MB)
+  const maxSize = 5 * 1024 * 1024
   if (file.size > maxSize) {
-    imageError.value = `File is too large (${(file.size / 1024).toFixed(0)}KB). Maximum supported size is 800KB.`
+    imageError.value = `File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum supported size is 5MB.`
     return
   }
 
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    previewImageUrl.value = e.target?.result as string
-    imageFileName.value = file.name
-    imageWasModified.value = true
-  }
-  reader.onerror = () => {
-    imageError.value = 'Failed to read image file.'
-  }
-  reader.readAsDataURL(file)
+  selectedFile.value = file
+  previewImageUrl.value = URL.createObjectURL(file)
+  imageFileName.value = file.name
+  imageWasModified.value = true
+  imageWasCleared.value = false
 }
 
 function handleFileSelect(e: Event) {
@@ -137,10 +132,12 @@ function handleFileDrop(e: DragEvent) {
 }
 
 function clearImage() {
+  selectedFile.value = null
   previewImageUrl.value = null
   imageFileName.value = ''
   imageError.value = ''
   imageWasModified.value = true
+  imageWasCleared.value = true
   if (fileInputRef.value) {
     fileInputRef.value.value = ''
   }
@@ -151,10 +148,12 @@ function openCreateModal() {
   formName.value = ''
   formDescription.value = ''
   formPrice.value = ''
+  selectedFile.value = null
   previewImageUrl.value = null
   imageFileName.value = ''
   imageError.value = ''
   imageWasModified.value = false
+  imageWasCleared.value = false
 
   // Pick first available category or existing product's category
   const defaultCatId =
@@ -174,14 +173,14 @@ function openEditModal(prod: Product) {
   formPrice.value = prod.price
   formCategoryId.value = prod.categoryId
   formIsActive.value = prod.isActive
+  selectedFile.value = null
   imageError.value = ''
   imageWasModified.value = false
+  imageWasCleared.value = false
 
-  // Load existing custom image if any
-  const existingCustom = getProductCustomImage(prod.id)
-  if (existingCustom) {
-    previewImageUrl.value = existingCustom
-    imageFileName.value = 'Existing Custom Image'
+  if (prod.imageUrl) {
+    previewImageUrl.value = prod.imageUrl
+    imageFileName.value = 'Current Cloudinary Image'
   } else {
     previewImageUrl.value = null
     imageFileName.value = ''
@@ -201,7 +200,36 @@ async function handleSaveProduct() {
   successMessage.value = ''
 
   try {
-    let savedProductId = ''
+    let finalImageUrl: string | null = null
+    let finalImagePublicId: string | null = null
+
+    // 1. If a new image was selected, upload directly to Cloudinary through the backend
+    if (selectedFile.value) {
+      isUploadingImage.value = true
+      try {
+        const uploadResult = await uploadProductImage(selectedFile.value)
+        finalImageUrl = uploadResult.secureUrl
+        finalImagePublicId = uploadResult.publicId
+      } catch (uploadErr: any) {
+        console.error('Cloudinary upload failed:', uploadErr)
+        const msg =
+          uploadErr.response?.data?.message ||
+          'Failed to upload image to Cloudinary. Please verify backend Cloudinary configuration.'
+        imageError.value = msg
+        errorMessage.value = msg
+        isSubmitting.value = false
+        isUploadingImage.value = false
+        return
+      } finally {
+        isUploadingImage.value = false
+      }
+    } else if (imageWasCleared.value) {
+      finalImageUrl = null
+      finalImagePublicId = null
+    } else if (editingProduct.value) {
+      // Retain existing image if not changed
+      finalImageUrl = editingProduct.value.imageUrl ?? null
+    }
 
     if (editingProduct.value) {
       // Update
@@ -211,9 +239,10 @@ async function handleSaveProduct() {
         price: Number(formPrice.value),
         isActive: formIsActive.value,
         categoryId: formCategoryId.value,
+        imageUrl: finalImageUrl,
+        imagePublicId: finalImagePublicId ?? undefined,
       }
-      const updated = await updateProduct(editingProduct.value.id, req)
-      savedProductId = updated.id || editingProduct.value.id
+      await updateProduct(editingProduct.value.id, req)
       successMessage.value = `Product "${formName.value}" updated successfully.`
     } else {
       // Create
@@ -222,19 +251,11 @@ async function handleSaveProduct() {
         description: formDescription.value.trim(),
         price: Number(formPrice.value),
         categoryId: formCategoryId.value,
+        imageUrl: finalImageUrl,
+        imagePublicId: finalImagePublicId,
       }
-      const created = await createProduct(req)
-      savedProductId = created.id
+      await createProduct(req)
       successMessage.value = `New harvest product "${formName.value}" created successfully.`
-    }
-
-    // Persist custom product image
-    if (savedProductId && imageWasModified.value) {
-      if (previewImageUrl.value) {
-        saveProductCustomImage(savedProductId, previewImageUrl.value)
-      } else {
-        removeProductCustomImage(savedProductId)
-      }
     }
 
     isFormModalOpen.value = false
@@ -261,9 +282,6 @@ async function confirmDeleteProduct() {
 
   try {
     await deleteProduct(deletingProduct.value.id)
-    // Clean up local image registry
-    removeProductCustomImage(deletingProduct.value.id)
-
     successMessage.value = `Product "${deletingProduct.value.name}" deleted from catalogue.`
     isDeleteModalOpen.value = false
     deletingProduct.value = null
@@ -290,7 +308,7 @@ onMounted(loadData)
           Product Catalogue Management
         </h2>
         <p class="mt-1 text-xs text-stone-500">
-          Create, edit pricing, assign custom photography, or manage harvest items.
+          Create, edit pricing, upload Cloudinary photography, or manage harvest items.
         </p>
       </div>
 
@@ -375,14 +393,15 @@ onMounted(loadData)
               :key="prod.id"
               class="hover:bg-stone-50/50 transition"
             >
-              <!-- Product with Image Avatar -->
+              <!-- Product with Cloudinary Image Avatar -->
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
                   <div class="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
                     <img
-                      :src="getProductImageUrl(prod.name, prod.categoryName, undefined, prod.id)"
+                      :src="getProductImageUrl(prod)"
                       :alt="prod.name"
                       class="h-full w-full object-cover"
+                      loading="lazy"
                     />
                   </div>
                   <div>
@@ -515,10 +534,10 @@ onMounted(loadData)
           </div>
         </div>
 
-        <!-- Product Image Upload / Assignment Component -->
+        <!-- Cloudinary Product Image Upload / Assignment Component -->
         <div>
           <label class="block text-xs font-bold uppercase tracking-wider text-stone-700">
-            Product Photography
+            Product Photography (Cloudinary)
           </label>
 
           <!-- Preview & Replace State -->
@@ -531,11 +550,11 @@ onMounted(loadData)
             </div>
             <div class="flex-1 min-w-0">
               <span class="text-xs font-bold text-stone-900 block truncate">
-                {{ imageFileName || 'Custom Uploaded Image' }}
+                {{ imageFileName || 'Product Image' }}
               </span>
               <span class="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
                 <CheckCircle2 class="h-3 w-3" />
-                Persisted to storefront
+                {{ selectedFile ? 'Ready to upload to Cloudinary' : 'Stored in Cloudinary' }}
               </span>
             </div>
             <div class="flex items-center gap-2">
@@ -574,7 +593,7 @@ onMounted(loadData)
               <span class="text-amber-700 font-bold">Upload image</span> or drag & drop
             </p>
             <p class="mt-1 text-[10px] text-stone-400">
-              JPEG, PNG or WebP up to 800KB. Persists locally across refreshes.
+              JPEG, PNG or WebP up to 5MB. Uploaded securely to Cloudinary CDN.
             </p>
             <input
               ref="fileInputRef"
@@ -609,6 +628,7 @@ onMounted(loadData)
           <button
             type="button"
             class="rounded-xl border border-stone-200 px-4 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100"
+            :disabled="isSubmitting"
             @click="isFormModalOpen = false"
           >
             Cancel
@@ -616,9 +636,10 @@ onMounted(loadData)
           <button
             type="submit"
             :disabled="isSubmitting"
-            class="rounded-xl bg-amber-500 px-5 py-2 text-xs font-bold text-stone-950 shadow-md shadow-amber-900/10 hover:bg-amber-400 disabled:opacity-50"
+            class="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2 text-xs font-bold text-stone-950 shadow-md shadow-amber-900/10 hover:bg-amber-400 disabled:opacity-50"
           >
-            {{ isSubmitting ? 'Saving...' : 'Save Product' }}
+            <Loader2 v-if="isSubmitting" class="h-3.5 w-3.5 animate-spin" />
+            <span>{{ isUploadingImage ? 'Uploading to Cloudinary...' : isSubmitting ? 'Saving...' : 'Save Product' }}</span>
           </button>
         </div>
       </form>

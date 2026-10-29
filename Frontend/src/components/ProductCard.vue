@@ -60,7 +60,7 @@ async function handleAddToCart(e: Event) {
     <!-- Image container -->
     <div class="relative aspect-4/3 w-full overflow-hidden bg-stone-100">
       <img
-        :src="imgError ? DEFAULT_PRODUCT_FALLBACK : getProductImageUrl(product.name, product.categoryName, undefined, product.id)"
+        :src="imgError ? DEFAULT_PRODUCT_FALLBACK : getProductImageUrl(product)"
         :alt="product.name"
         class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
         loading="lazy"

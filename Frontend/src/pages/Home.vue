@@ -10,7 +10,6 @@ import {
   ShoppingBag,
   CheckCircle2,
   Package,
-  Layers,
 } from 'lucide-vue-next'
 import { getProducts } from '../services/productService'
 import { getCategories } from '../services/categoryService'
@@ -19,7 +18,7 @@ import type { CategoryResponse } from '../types/categoryType'
 import { getCategoryImageUrl, isNutCategory } from '../utils/productImages'
 import ProductCard from '../components/ProductCard.vue'
 import Image from '../../public/images/dry_fruits.jpg'
-import Apricot from '../../public/images/Apricot.jpg'
+//import Apricot from '../../public/images/Apricot.jpg'
 
 interface CategoryWithCount {
   id: string
@@ -118,6 +117,9 @@ const processedCategories = computed<CategoryWithCount[]>(() => {
 // Distinct classification: Dry Fruits vs Nuts
 const dryFruitCategories = computed(() => processedCategories.value.filter(c => !c.isNut))
 const nutCategories = computed(() => processedCategories.value.filter(c => c.isNut))
+const homeCategories = computed(() =>
+  [...dryFruitCategories.value, ...nutCategories.value].slice(0, 4)
+)
 
 onMounted(loadData)
 </script>
@@ -216,181 +218,124 @@ onMounted(loadData)
         </div>
       </div>
     </section>
-
+  
     <!-- SHOP BY CATEGORY SECTION -->
-    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
+    <section
+      id="shop-by-category"
+      class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+    >
       <!-- Section Header -->
-      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-stone-200 pb-5">
+      <div
+        class="flex flex-col gap-4 border-b border-stone-200 pb-5 sm:flex-row sm:items-end sm:justify-between"
+      >
         <div>
-          <span class="text-xs font-bold uppercase tracking-widest text-amber-800">
+          <span
+            class="text-xs font-bold uppercase tracking-widest text-amber-800"
+          >
             Curated Baltistan Terroir
           </span>
-          <h2 class="mt-2 font-serif text-3xl font-extrabold text-stone-900 sm:text-4xl">
+
+          <h2
+            class="mt-2 font-serif text-3xl font-extrabold text-stone-900 sm:text-4xl"
+          >
             Shop by Category
           </h2>
+
           <p class="mt-1.5 text-sm text-stone-600">
-            Explore authentic dry fruits and mountain nuts sun-cured at extreme altitude.
+            Explore authentic dry fruits and nuts from the mountains.
           </p>
         </div>
 
-        <router-link
-          to="/products"
-          class="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-900 hover:text-emerald-700 transition"
+        <RouterLink
+          to="/categories"
+          class="inline-flex shrink-0 items-center gap-2 text-sm font-bold text-emerald-900 transition hover:text-emerald-700"
         >
-          <span>View All Products</span>
+          <span>View All Categories</span>
           <ArrowRight class="h-4 w-4" />
-        </router-link>
+        </RouterLink>
       </div>
 
-      <!-- Loading State for Categories -->
-      <div v-if="isCategoryLoading" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div v-for="i in 3" :key="i" class="animate-pulse rounded-3xl border border-stone-200 bg-white p-5">
-          <div class="aspect-16/10 rounded-2xl bg-stone-200" />
-          <div class="mt-4 h-6 w-1/2 rounded bg-stone-200" />
-          <div class="mt-2 h-4 w-1/4 rounded bg-stone-200" />
-        </div>
-      </div>
-
-      <div v-else class="space-y-12">
-        <!-- 1. DRY FRUITS SUBSECTION -->
-        <div v-if="dryFruitCategories.length > 0" class="space-y-6">
-          <div class="flex items-center gap-3">
-            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-800 font-bold">
-              <Sun class="h-4 w-4" />
-            </div>
-            <div>
-              <h3 class="font-serif text-xl font-bold text-stone-900">Mountain Dry Fruits</h3>
-              <p class="text-xs text-stone-500">Naturally sweet, sun-cured apricots, mulberries and figs</p>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <router-link
-              v-for="cat in dryFruitCategories"
-              :key="cat.id"
-              :to="{ path: '/products', query: { category: cat.name } }"
-              class="group relative flex flex-col overflow-hidden rounded-3xl border border-stone-200/90 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-amber-700/40 hover:shadow-xl"
-            >
-              <!-- Image with gradient and zoom -->
-              <div class="relative aspect-4/3 w-full overflow-hidden bg-stone-100">
-                <img
-                  :src="Image"
-                  :alt="cat.name"
-                  class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
-                />
-                <div class="absolute inset-0 bg-gradient-to-t from-stone-950/85 via-stone-950/30 to-transparent" />
-
-                <!-- Category Badge -->
-                <div class="absolute top-3 left-3">
-                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-500/90 px-3 py-1 text-xs font-bold text-stone-950 backdrop-blur-xs shadow-xs">
-                    <Sun class="h-3 w-3" />
-                    <span>Dry Fruit</span>
-                  </span>
-                </div>
-
-                <!-- Product Count Pill -->
-                <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
-                  <span class="font-serif text-2xl font-bold tracking-tight text-white group-hover:text-amber-300 transition-colors">
-                    {{ cat.name }}
-                  </span>
-                  <span class="inline-flex items-center gap-1.5 rounded-full bg-stone-900/80 px-2.5 py-1 text-xs font-semibold backdrop-blur-xs text-stone-200 border border-stone-700">
-                    <Package class="h-3 w-3 text-amber-400" />
-                    {{ cat.productCount }} {{ cat.productCount === 1 ? 'product' : 'products' }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Content and Action Link -->
-              <div class="flex flex-1 flex-col justify-between p-5">
-                <p class="text-xs text-stone-600 line-clamp-2 leading-relaxed">
-                  {{ cat.description || `Premium organic ${cat.name.toLowerCase()} hand-harvested from high Baltistan valleys.` }}
-                </p>
-
-                <div class="mt-4 flex items-center justify-between border-t border-stone-100 pt-3 text-xs font-bold text-emerald-900 group-hover:text-amber-700 transition-colors">
-                  <span>Explore {{ cat.name }}</span>
-                  <ArrowRight class="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </div>
-              </div>
-            </router-link>
-          </div>
-        </div>
-
-        <!-- 2. KARAKORAM NUTS SUBSECTION -->
-        <div v-if="nutCategories.length > 0" class="space-y-6">
-          <div class="flex items-center gap-3">
-            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 font-bold">
-              <Layers class="h-4 w-4" />
-            </div>
-            <div>
-              <h3 class="font-serif text-xl font-bold text-stone-900">Karakoram Mountain Nuts</h3>
-              <p class="text-xs text-stone-500">Kagzi walnuts, sweet giri almonds and wild mountain pine nuts</p>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <router-link
-              v-for="cat in nutCategories"
-              :key="cat.id"
-              :to="{ path: '/products', query: { category: cat.name } }"
-              class="group relative flex flex-col overflow-hidden rounded-3xl border border-stone-200/90 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-amber-700/40 hover:shadow-xl"
-            >
-              <!-- Image with gradient and zoom -->
-              <div class="relative aspect-4/3 w-full overflow-hidden bg-stone-100">
-                <img
-                  :src="Apricot"
-                  :alt="cat.name"
-                  class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
-                />
-                <div class="absolute inset-0 bg-gradient-to-t from-stone-950/85 via-stone-950/30 to-transparent" />
-
-                <!-- Category Badge -->
-                <div class="absolute top-3 left-3">
-                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-600/90 px-3 py-1 text-xs font-bold text-white backdrop-blur-xs shadow-xs">
-                    <Layers class="h-3 w-3" />
-                    <span>Tree Nut</span>
-                  </span>
-                </div>
-
-                <!-- Product Count Pill -->
-                <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
-                  <span class="font-serif text-2xl font-bold tracking-tight text-white group-hover:text-amber-300 transition-colors">
-                    {{ cat.name }}
-                  </span>
-                  <span class="inline-flex items-center gap-1.5 rounded-full bg-stone-900/80 px-2.5 py-1 text-xs font-semibold backdrop-blur-xs text-stone-200 border border-stone-700">
-                    <Package class="h-3 w-3 text-amber-400" />
-                    {{ cat.productCount }} {{ cat.productCount === 1 ? 'product' : 'products' }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Content and Action Link -->
-              <div class="flex flex-1 flex-col justify-between p-5">
-                <p class="text-xs text-stone-600 line-clamp-2 leading-relaxed">
-                  {{ cat.description || `Pure mountain ${cat.name.toLowerCase()} rich in essential oils and wholesome nutrients.` }}
-                </p>
-
-                <div class="mt-4 flex items-center justify-between border-t border-stone-100 pt-3 text-xs font-bold text-emerald-900 group-hover:text-amber-700 transition-colors">
-                  <span>Explore {{ cat.name }}</span>
-                  <ArrowRight class="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </div>
-              </div>
-            </router-link>
-          </div>
-        </div>
-
-        <!-- Empty Categories Fallback -->
+      <!-- Loading State -->
+      <div
+        v-if="isCategoryLoading"
+        class="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4"
+      >
         <div
-          v-if="dryFruitCategories.length === 0 && nutCategories.length === 0"
-          class="rounded-3xl border border-stone-200 bg-white p-12 text-center"
+          v-for="i in 4"
+          :key="i"
+          class="animate-pulse overflow-hidden rounded-2xl border border-stone-200 bg-white p-3"
         >
-          <Package class="mx-auto h-10 w-10 text-stone-400" />
-          <h3 class="mt-3 font-bold text-stone-900">Categories Loading</h3>
-          <p class="mt-1 text-xs text-stone-500">Categories are being retrieved from the harvest catalogue.</p>
+          <div class="aspect-[4/3] rounded-xl bg-stone-200"></div>
+          <div class="mt-3 h-5 w-2/3 rounded bg-stone-200"></div>
+          <div class="mt-2 h-3 w-1/3 rounded bg-stone-200"></div>
         </div>
+      </div>
+
+      <!-- Four-Category Preview -->
+      <div
+        v-else-if="homeCategories.length > 0"
+        class="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4"
+      >
+        <RouterLink
+          v-for="cat in homeCategories"
+          :key="cat.id"
+          :to="{
+            path: '/products',
+            query: { category: cat.name }
+          }"
+          class="group overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-amber-700/40 hover:shadow-lg"
+        >
+          <!-- Category Image -->
+          <div class="relative aspect-[4/3] overflow-hidden bg-stone-100">
+            <img
+              :src="cat.image"
+              :alt="cat.name"
+              class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+            />
+
+            <div
+              class="absolute inset-0 bg-gradient-to-t from-stone-950/60 to-transparent"
+            ></div>
+
+            <span
+              class="absolute bottom-3 left-3 right-3 truncate font-serif text-lg font-bold text-white transition-colors group-hover:text-amber-300 sm:text-xl"
+            >
+              {{ cat.name }}
+            </span>
+          </div>
+
+          <!-- Category Details -->
+          <div class="flex items-center justify-between gap-2 p-3 sm:p-4">
+            <span class="text-xs text-stone-600 sm:text-sm">
+              {{ cat.productCount }}
+              {{ cat.productCount === 1 ? 'product' : 'products' }}
+            </span>
+
+            <ArrowRight
+              class="h-4 w-4 shrink-0 text-emerald-900 transition-transform group-hover:translate-x-1 group-hover:text-amber-700"
+            />
+          </div>
+        </RouterLink>
+      </div>
+
+      <!-- Empty State -->
+      <div
+        v-else
+        class="mt-6 rounded-2xl border border-stone-200 bg-white p-8 text-center"
+      >
+        <Package class="mx-auto h-8 w-8 text-stone-400" />
+
+        <h3 class="mt-3 font-bold text-stone-900">
+          No Categories Available
+        </h3>
+
+        <p class="mt-1 text-sm text-stone-500">
+          Please check back later to explore our mountain harvest.
+        </p>
       </div>
     </section>
+
 
     <!-- Featured Products from API -->
     <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

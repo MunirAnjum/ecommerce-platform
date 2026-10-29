@@ -35,9 +35,10 @@ export async function updateCartItem(
 }
 
 export async function removeCartItem(
-  productId: string
+  productId: string,
+  weightInGrams: number
 ): Promise<void> {
   await api.delete(
-    `/api/Cart/item/${productId}`
+    `/api/Cart/item/${productId}/${weightInGrams}`
   )
 }

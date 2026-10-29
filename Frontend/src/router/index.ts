@@ -18,6 +18,7 @@ import AdminOrders from '../pages/AdminOrders.vue'
 import AdminProducts from '../pages/AdminProducts.vue'
 import AdminCategories from '../pages/AdminCategories.vue'
 import AdminInventory from '../pages/AdminInventory.vue'
+import CategoryLanding from '../pages/CategoryLanding.vue'
 
 function hasAdminRole(token: string): boolean {
   try {
@@ -73,6 +74,24 @@ const router = createRouter({
           path: 'products/:id',
           name: 'product-details',
           component: ProductDetails,
+        },
+        {
+          path: 'categories',
+          name: 'categories',
+          component: CategoryLanding,
+          props: { categoryType: 'all' },
+        },
+        {
+          path: 'dry-fruits',
+          name: 'dry-fruits',
+          component: CategoryLanding,
+          props: { categoryType: 'dry-fruits' },
+        },
+        {
+          path: 'nuts',
+          name: 'nuts',
+          component: CategoryLanding,
+          props: { categoryType: 'nuts' },
         },
         {
           path: 'cart',

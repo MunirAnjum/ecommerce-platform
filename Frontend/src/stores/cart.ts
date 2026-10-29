@@ -1,4 +1,3 @@
-
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import {
@@ -31,48 +30,87 @@ export const useCartStore = defineStore('cart', () => {
     applyCart(cart)
   }
 
-  async function addToCart(productId: string) {
+  async function addToCart(
+    productId: string,
+    weightInGrams = 250,
+    quantity = 1
+  ) {
     const cart = await addToCartApi({
       productId,
-      quantity: 1,
+      weightInGrams,
+      quantity,
     })
 
     applyCart(cart)
   }
 
-  async function increaseQuantity(productId: string) {
-    const item = items.value.find(item => item.productId === productId)
+  async function increaseQuantity(
+    productId: string,
+    weightInGrams: number
+  ) {
+    const item = items.value.find(
+      item =>
+        item.productId === productId &&
+        item.weightInGrams === weightInGrams
+    )
 
     if (!item) return
 
     const cart = await updateCartItem(productId, {
+      weightInGrams,
       quantity: item.quantity + 1,
     })
 
     applyCart(cart)
   }
 
-  async function decreaseQuantity(productId: string) {
-    const item = items.value.find(item => item.productId === productId)
+  async function decreaseQuantity(
+    productId: string,
+    weightInGrams: number
+  ) {
+    const item = items.value.find(
+      item =>
+        item.productId === productId &&
+        item.weightInGrams === weightInGrams
+    )
 
     if (!item) return
 
     if (item.quantity === 1) {
-      await removeCartItem(productId)
-      items.value = items.value.filter(item => item.productId !== productId)
+      await removeCartItem(productId, weightInGrams)
+
+      items.value = items.value.filter(
+        item =>
+          !(
+            item.productId === productId &&
+            item.weightInGrams === weightInGrams
+          )
+      )
+
       return
     }
 
     const cart = await updateCartItem(productId, {
+      weightInGrams,
       quantity: item.quantity - 1,
     })
 
     applyCart(cart)
   }
 
-  async function removeFromCart(productId: string) {
-    await removeCartItem(productId)
-    items.value = items.value.filter(item => item.productId !== productId)
+  async function removeFromCart(
+    productId: string,
+    weightInGrams: number
+  ) {
+    await removeCartItem(productId, weightInGrams)
+
+    items.value = items.value.filter(
+      item =>
+        !(
+          item.productId === productId &&
+          item.weightInGrams === weightInGrams
+        )
+    )
   }
 
   // Call only after the Order Service confirms successful order creation.

@@ -13,11 +13,14 @@ import {
 } from 'lucide-vue-next'
 import { useCartStore } from '../stores/cart'
 import { getInventoryByProductId } from '../services/inventoryService'
+import { getProducts } from '../services/productService'
+import type { Product } from '../types/productType'
 import { formatPrice } from '../utils/formatters'
 import { getProductImageUrl } from '../utils/productImages'
 import { brandConfig } from '../config/brand'
 
 const cartStore = useCartStore()
+const productMap = ref<Record<string, Product>>({})
 
 const availableStock = ref<Record<string, number>>({})
 const inventoryErrors = ref<Record<string, string>>({})
@@ -42,65 +45,111 @@ async function checkStock() {
   isCheckingStock.value = false
 }
 
-async function increaseQuantity(productId: string) {
-  const item = cartStore.items.find(item => item.productId === productId)
+function getTotalProductQuantity(productId: string): number {
+  return cartStore.items
+    .filter(item => item.productId === productId)
+    .reduce((total, item) => total + item.quantity, 0)
+}
+
+async function increaseQuantity(productId: string, weightInGrams: number) {
+  const item = cartStore.items.find(
+    item =>
+      item.productId === productId &&
+      item.weightInGrams === weightInGrams,
+  )
+
   if (!item) return
 
   const stock = availableStock.value[productId]
+
   if (stock === undefined) {
-    inventoryErrors.value[productId] = 'Stock has not been verified yet.'
+    inventoryErrors.value[productId] =
+      'Stock has not been verified yet.'
     return
   }
 
-  if (item.quantity >= stock) {
-    inventoryErrors.value[productId] = `Only ${stock} unit(s) are available.`
+  // Inventory is currently tracked per product, not per weight variant.
+  const totalProductQuantity = cartStore.items
+    .filter(item => item.productId === productId)
+    .reduce((total, item) => total + item.quantity, 0)
+
+  if (totalProductQuantity >= stock) {
+    inventoryErrors.value[productId] =
+      `Only ${stock} package(s) are available across all weights.`
     return
   }
 
   try {
-    await cartStore.increaseQuantity(productId)
+    await cartStore.increaseQuantity(productId, weightInGrams)
     delete inventoryErrors.value[productId]
   } catch (error) {
     console.error('Failed to increase quantity:', error)
-    inventoryErrors.value[productId] = 'Unable to update quantity. Please try again.'
+    inventoryErrors.value[productId] =
+      'Unable to update quantity. Please try again.'
   }
 }
 
-async function decreaseQuantity(productId: string) {
+async function decreaseQuantity(productId: string, weightInGrams: number) {
   try {
-    await cartStore.decreaseQuantity(productId)
+    await cartStore.decreaseQuantity(productId, weightInGrams)
     delete inventoryErrors.value[productId]
   } catch (error) {
     console.error('Failed to decrease quantity:', error)
-    inventoryErrors.value[productId] = 'Unable to update quantity. Please try again.'
+    inventoryErrors.value[productId] =
+      'Unable to update quantity. Please try again.'
   }
 }
 
-async function removeItem(productId: string) {
+async function removeItem(productId: string, weightInGrams: number) {
   try {
-    await cartStore.removeFromCart(productId)
+    await cartStore.removeFromCart(productId, weightInGrams)
     delete inventoryErrors.value[productId]
-    delete availableStock.value[productId]
   } catch (error) {
     console.error('Failed to remove item:', error)
+    inventoryErrors.value[productId] =
+      'Unable to remove item. Please try again.'
   }
 }
 
 const canCheckout = computed(() => {
-  return (
-    !isCheckingStock.value &&
-    cartStore.items.length > 0 &&
-    cartStore.items.every(item =>
-      availableStock.value[item.productId] !== undefined &&
-      item.quantity <= availableStock.value[item.productId]
-    ) &&
-    Object.keys(inventoryErrors.value).length === 0
+  if (
+    isCheckingStock.value ||
+    cartStore.items.length === 0 ||
+    Object.keys(inventoryErrors.value).length > 0
+  ) {
+    return false
+  }
+
+  const totalQuantityByProduct = new Map<string, number>()
+
+  for (const item of cartStore.items) {
+    const currentQuantity =
+      totalQuantityByProduct.get(item.productId) ?? 0
+
+    totalQuantityByProduct.set(
+      item.productId,
+      currentQuantity + item.quantity,
+    )
+  }
+
+  return Array.from(totalQuantityByProduct.entries()).every(
+    ([productId, totalQuantity]) => {
+      const stock = availableStock.value[productId]
+
+      return stock !== undefined && totalQuantity <= stock
+    },
   )
 })
 
 onMounted(async () => {
   try {
-    await cartStore.loadCart()
+    const [prods] = await Promise.all([
+      getProducts().catch(() => [] as Product[]),
+      cartStore.loadCart(),
+    ])
+    prods.forEach(p => {
+      productMap.value[p.id] = p
+    })
     await checkStock()
   } catch (error) {
     console.error('Failed to load cart:', error)
@@ -156,13 +205,13 @@ onMounted(async () => {
 
         <div
           v-for="item in cartStore.items"
-          :key="item.productId"
+          :key="`${item.productId}-${item.weightInGrams}`"
           class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-stone-200 bg-white p-5 shadow-xs transition hover:border-stone-300"
         >
           <!-- Item info & Thumbnail -->
           <div class="flex items-center gap-4 min-w-0 flex-1">
             <img
-              :src="getProductImageUrl(item.productName)"
+              :src="getProductImageUrl(productMap[item.productId] || item.productName)"
               :alt="item.productName"
               class="h-20 w-20 rounded-2xl object-cover bg-stone-100 shrink-0"
               loading="lazy"
@@ -172,26 +221,38 @@ onMounted(async () => {
               <h3 class="font-bold text-base text-stone-900 truncate">
                 {{ item.productName }}
               </h3>
-              <p class="text-xs text-stone-500 mt-0.5">
-                Unit Price: <strong class="text-stone-700">{{ formatPrice(item.unitPrice) }}</strong>
+              <p>
+                Unit Price:
+                <strong class="text-stone-700">
+                  {{ formatPrice(item.unitPrice) }}
+                </strong>
+              </p>
+
+              <p>
+                Unit Weight:
+                <strong class="text-stone-700">
+                  {{
+                    item.weightInGrams === 1000
+                      ? '1kg'
+                      : `${item.weightInGrams}g`
+                  }}
+                </strong>
               </p>
 
               <!-- Stock information indicators -->
               <div class="mt-2 space-y-1">
-                <span
-                  v-if="availableStock[item.productId] !== undefined"
-                  class="inline-block text-2xs font-semibold px-2 py-0.5 rounded-md"
-                  :class="availableStock[item.productId] > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'"
-                >
-                  {{ availableStock[item.productId] > 0 ? `${availableStock[item.productId]} available in stock` : 'Out of stock' }}
-                </span>
-
                 <p
-                  v-if="availableStock[item.productId] !== undefined && item.quantity > availableStock[item.productId]"
+                  v-if="
+                    availableStock[item.productId] !== undefined &&
+                    getTotalProductQuantity(item.productId) > availableStock[item.productId]
+                  "
                   class="text-xs font-bold text-rose-700 flex items-center gap-1"
                 >
                   <AlertCircle class="h-3.5 w-3.5 shrink-0" />
-                  <span>Only {{ availableStock[item.productId] }} unit(s) available. Reduce quantity before checkout.</span>
+                  <span>
+                    Only {{ availableStock[item.productId] }} package(s) available across all weights.
+                    Reduce quantity before checkout.
+                  </span>
                 </p>
 
                 <p
@@ -213,7 +274,7 @@ onMounted(async () => {
                 type="button"
                 class="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-stone-700 shadow-2xs hover:bg-stone-100 transition"
                 aria-label="Decrease quantity"
-                @click="decreaseQuantity(item.productId)"
+                @click="decreaseQuantity(item.productId, item.weightInGrams)"
               >
                 <Minus class="h-3.5 w-3.5" />
               </button>
@@ -228,10 +289,10 @@ onMounted(async () => {
                 :disabled="
                   isCheckingStock ||
                   availableStock[item.productId] === undefined ||
-                  item.quantity >= availableStock[item.productId]
+                  getTotalProductQuantity(item.productId) >= availableStock[item.productId]
                 "
                 aria-label="Increase quantity"
-                @click="increaseQuantity(item.productId)"
+                @click="increaseQuantity(item.productId, item.weightInGrams)"
               >
                 <Plus class="h-3.5 w-3.5" />
               </button>
@@ -251,7 +312,7 @@ onMounted(async () => {
               class="rounded-xl p-2 text-stone-400 hover:bg-rose-50 hover:text-rose-600 transition"
               title="Remove item"
               aria-label="Remove item"
-              @click="removeItem(item.productId)"
+              @click="removeItem(item.productId, item.weightInGrams)"
             >
               <Trash2 class="h-4 w-4" />
             </button>

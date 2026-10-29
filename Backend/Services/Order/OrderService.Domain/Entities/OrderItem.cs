@@ -13,7 +13,9 @@ public class OrderItem
 
     public Guid ProductId { get; set; }
 
-    public string ProductName { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+
+    public int WeightInGrams { get; set; }
 
     public decimal UnitPrice { get; set; }
 
@@ -28,13 +30,14 @@ public class OrderItem
         
     }
 
-    public OrderItem(Guid productId, string productName, decimal unitPrice, int qunatity)
+    public OrderItem(Guid productId, string productName, decimal unitPrice, int qunatity, int weightInGrams = 250) 
     {
         Id = Guid.NewGuid();
         ProductId = productId;
         ProductName = productName;
         UnitPrice = unitPrice;
         Quantity = qunatity;
+        WeightInGrams = weightInGrams;
     }
 
     public void SetOrderId(Guid orderId)

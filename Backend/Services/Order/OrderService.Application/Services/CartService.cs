@@ -37,6 +37,8 @@ public class CartService : ICartService
                 "Quantity must be greater than zero.");
         }
 
+        ValidateWeight(request.WeightInGrams);
+
         var product =
             await _productServiceClient.GetProductByIdAsync(
                 request.ProductId);
@@ -52,7 +54,8 @@ public class CartService : ICartService
         var existingItem =
             await _cartRepository.GetItemAsync(
                 userId,
-                request.ProductId);
+                request.ProductId,
+                request.WeightInGrams);
 
         if (existingItem is not null)
         {
@@ -66,7 +69,8 @@ public class CartService : ICartService
             var newItem = new CartItem(
                 cart.Id,
                 product.Id,
-                request.Quantity);
+                request.Quantity,
+                request.WeightInGrams);
 
             await _cartRepository.AddItemAsync(newItem);
         }
@@ -85,6 +89,8 @@ public class CartService : ICartService
                 "Quantity must be greater than zero.");
         }
 
+        ValidateWeight(request.WeightInGrams);
+
         var cart =
             await _cartRepository.GetByUserIdAsync(userId);
 
@@ -97,7 +103,8 @@ public class CartService : ICartService
         var item =
             await _cartRepository.GetItemAsync(
                 userId,
-                productId);
+                productId,
+                request.WeightInGrams);
 
         if (item is null)
         {
@@ -114,11 +121,13 @@ public class CartService : ICartService
 
     public async Task RemoveItemAsync(
     Guid userId,
-    Guid productId)
+    Guid productId,
+    int weightInGrams)
     {
         var item = await _cartRepository.GetItemAsync(
             userId,
-            productId);
+            productId,
+            weightInGrams);
 
         if (item is null)
         {
@@ -170,15 +179,17 @@ public class CartService : ICartService
                 continue;
             }
 
-            var totalPrice =
-                product.Price * item.Quantity;
+            var unitPrice = CalculateUnitPrice(product.Price, item.WeightInGrams);
+
+            var totalPrice = unitPrice * item.Quantity;
 
             response.Items.Add(new CartItemResponse
             {
                 Id = item.Id,
                 ProductId = item.ProductId,
                 ProductName = product.Name,
-                UnitPrice = product.Price,
+                UnitPrice = unitPrice,
+                WeightInGrams = item.WeightInGrams,
                 Quantity = item.Quantity,
                 TotalPrice = totalPrice
             });
@@ -194,4 +205,22 @@ public class CartService : ICartService
     {
         return await _cartRepository.GetItemsAsync(cartId);
     }
+
+
+    private static void ValidateWeight(int weightInGrams)
+    {
+        if (weightInGrams is not (250 or 500 or 1000))
+        {
+            throw new InvalidOperationException(
+                "Weight must be 250g, 500g, or 1000g.");
+        }
+    }
+
+    private static decimal CalculateUnitPrice(
+        decimal basePrice,
+        int weightInGrams)
+    {
+        return basePrice * weightInGrams / 250m;
+    }
+    
 }

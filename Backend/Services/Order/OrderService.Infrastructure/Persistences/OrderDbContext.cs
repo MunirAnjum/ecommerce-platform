@@ -43,12 +43,16 @@ public class OrderDbContext : DbContext
             entity.HasIndex(x => new
             {
                 x.CartId,
-                x.ProductId
+                x.ProductId,
+                x.WeightInGrams
             })
             .IsUnique();
 
             entity.Property(x => x.Quantity)
-            .IsRequired();
+                .IsRequired();
+
+            entity.Property(x => x.WeightInGrams)
+                .IsRequired();
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -75,8 +79,12 @@ public class OrderDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(200);
 
+            entity.Property(x => x.WeightInGrams)
+                .IsRequired();
+
             entity.Property(x => x.UnitPrice)
                 .HasPrecision(18, 2);
+
         });
 
         modelBuilder.Entity<OutboxMessage>(entity =>

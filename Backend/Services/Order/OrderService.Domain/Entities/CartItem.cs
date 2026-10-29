@@ -13,16 +13,18 @@ public class CartItem
 
     public Guid ProductId { get; private set; }
 
+    public int WeightInGrams { get; private set; }
     public int Quantity { get; private set; }
 
     public Cart Cart { get; private set; } = null!;
 
-    public CartItem(Guid cartId, Guid productId, int quantity)
+    public CartItem(Guid cartId, Guid productId, int quantity, int weightInGrams)
     {
         Id = Guid.NewGuid();
         CartId = cartId;
         ProductId = productId;
         Quantity = quantity;
+        WeightInGrams = weightInGrams;
     }
 
     private CartItem() 

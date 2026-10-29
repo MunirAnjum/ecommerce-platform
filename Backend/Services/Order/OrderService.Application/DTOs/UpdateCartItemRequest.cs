@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿
 namespace OrderService.Application.DTOs;
+
 public class UpdateCartItemRequest
 {
+    public int WeightInGrams { get; set; } = 250;
+
     public int Quantity { get; set; }
 }

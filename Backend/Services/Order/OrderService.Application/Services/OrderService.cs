@@ -33,54 +33,49 @@ public class OrderService : IOrderService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<OrderResponse> CreateAsync(   
-        Guid userId,
-        CreateOrderRequest request)
+    public async Task<OrderResponse> CreateAsync(Guid userId, CreateOrderRequest request)
     {
-        var cart = await _cartRepository.GetByIdAsync(
-            request.CartId);
+        var cart = await _cartRepository.GetByIdAsync(request.CartId);
 
         if (cart is null)
         {
-            throw new KeyNotFoundException(
-                "Cart not found.");
+            throw new KeyNotFoundException("Cart not found.");
         }
 
         if (cart.UserId != userId)
         {
-            throw new UnauthorizedAccessException(
-                "You cannot access this cart.");
+            throw new UnauthorizedAccessException("You cannot access this cart.");
         }
 
-        var cartItems = await _cartRepository.GetItemsAsync(
-            cart.Id);
+        var cartItems = await _cartRepository.GetItemsAsync(cart.Id);
 
         if (!cartItems.Any())
         {
-            throw new InvalidOperationException(
-                "Cannot create order from an empty cart.");
+            throw new InvalidOperationException("Cannot create order from an empty cart.");
         }
 
         var orderItems = new List<OrderItem>();
 
         foreach (var cartItem in cartItems)
         {
-            var product =
-                await _productServiceClient
-                    .GetProductByIdAsync(cartItem.ProductId);
+            var product = await _productServiceClient.GetProductByIdAsync(cartItem.ProductId);
 
             if (product is null || !product.IsActive)
             {
-                throw new KeyNotFoundException(
-                    $"Product {cartItem.ProductId} was not found or is inactive.");
+                throw new KeyNotFoundException($"Product {cartItem.ProductId} was not found or is inactive.");
             }
+
+            var unitPrice = CalculatePackagePrice(
+                product.Price,
+                cartItem.WeightInGrams);
 
             var orderItem = new OrderItem(
                 product.Id,
                 product.Name,
-                product.Price,
-                cartItem.Quantity);
-                
+                unitPrice,
+                cartItem.Quantity,
+                cartItem.WeightInGrams);
+
             orderItems.Add(orderItem);
         }
 
@@ -91,18 +86,14 @@ public class OrderService : IOrderService
         {
             foreach (var item in orderItems)
             {
-                await _inventoryServiceClient.ReserveStockAsync(
-                    item.ProductId,
-                    item.Quantity);
+                await _inventoryServiceClient.ReserveStockAsync(item.ProductId, CalculateStockWeight(item));
 
                 reservedItems.Add(item);
             }
 
             var totalAmount = orderItems.Sum(x => x.TotalPrice);
 
-            order = new Order(
-                userId,
-                totalAmount);
+            order = new Order(userId, totalAmount);
 
             foreach (var item in orderItems)
             {
@@ -145,15 +136,12 @@ public class OrderService : IOrderService
             {
                 try
                 {
-                    await _inventoryServiceClient.ReleaseStockAsync(
-                        item.ProductId,
-                        item.Quantity);
+                    await _inventoryServiceClient.ReleaseStockAsync(item.ProductId, CalculateStockWeight(item));
                 }
                 catch (Exception releaseError)
                 {
                     // Replace with your application's ILogger logging.
-                    Console.Error.WriteLine(
-                        $"Stock compensation failed for product " +
+                    Console.Error.WriteLine( "Stock compensation failed for product " +
                         $"{item.ProductId}: {releaseError.Message}");
                 }
             }
@@ -164,30 +152,24 @@ public class OrderService : IOrderService
         return MapToResponse(order!);
     }
 
-    public async Task<OrderResponse> GetByIdAsync(
-        Guid userId,
-        Guid orderId)
+    public async Task<OrderResponse> GetByIdAsync(Guid userId, Guid orderId)
     {
-        var order = await _orderRepository.GetByIdAsync(
-            orderId);
+        var order = await _orderRepository.GetByIdAsync(orderId);
 
         if (order is null)
         {
-            throw new KeyNotFoundException(
-                "Order not found.");
+            throw new KeyNotFoundException("Order not found.");
         }
 
         if (order.UserId != userId)
         {
-            throw new UnauthorizedAccessException(
-                "You cannot access this order.");
+            throw new UnauthorizedAccessException("You cannot access this order.");
         }
 
         return MapToResponse(order);
     }
 
-    public async Task<List<OrderResponse>> GetMyOrdersAsync(
-        Guid userId)
+    public async Task<List<OrderResponse>> GetMyOrdersAsync(Guid userId)
     {
         var orders = await _orderRepository.GetByUserIdAsync(userId);
 
@@ -212,17 +194,13 @@ public class OrderService : IOrderService
 
         if (order is null)
         {
-            throw new KeyNotFoundException(
-                "Order not found.");
+            throw new KeyNotFoundException("Order not found.");
         }
 
         return MapToResponse(order);
     }
 
-    public async Task<OrderResponse> CancelAsync(
-    Guid userId,
-    Guid orderId,
-    bool isAdmin)
+    public async Task<OrderResponse> CancelAsync(Guid userId, Guid orderId, bool isAdmin)
     {
         var order = await _orderRepository.GetByIdAsync(orderId);
 
@@ -245,9 +223,7 @@ public class OrderService : IOrderService
 
         foreach (var item in order.Items)
         {
-            await _inventoryServiceClient.ReleaseStockAsync(
-                item.ProductId,
-                item.Quantity);
+            await _inventoryServiceClient.ReleaseStockAsync(item.ProductId, CalculateStockWeight(item));
         }
 
         order.Cancel();
@@ -296,7 +272,7 @@ public class OrderService : IOrderService
                     {
                         await _inventoryServiceClient.ReleaseStockAsync(
                             item.ProductId,
-                            item.Quantity);
+                            CalculateStockWeight(item));
                     }
                 }
                 else if (order.Status != OrderStatus.Confirmed)
@@ -388,7 +364,7 @@ public class OrderService : IOrderService
 
         foreach(var item in order.Items)
         {
-            await _inventoryServiceClient.ConfirmStockAsync(item.ProductId, item.Quantity);
+            await _inventoryServiceClient.ConfirmStockAsync(item.ProductId, CalculateStockWeight(item));
         }
 
         order.Confirm();
@@ -415,7 +391,7 @@ public class OrderService : IOrderService
             {
                 await _inventoryServiceClient.ConfirmStockAsync(
                     item.ProductId,
-                    item.Quantity);
+                    CalculateStockWeight(item));
             }
 
             order.Confirm();
@@ -426,6 +402,24 @@ public class OrderService : IOrderService
         }
 
         throw new KeyNotFoundException("Order not found.");
+    }
+
+    private static decimal CalculatePackagePrice(
+        decimal basePrice,
+        int weightInGrams)
+    {
+        if (weightInGrams is not (250 or 500 or 1000))
+        {
+            throw new InvalidOperationException(
+                "Weight must be 250g, 500g, or 1000g.");
+        }
+
+        return basePrice * weightInGrams / 250m;
+    }
+
+    private static int CalculateStockWeight(OrderItem item)
+    {
+        return checked(item.WeightInGrams * item.Quantity);
     }
 
     private static OrderResponse MapToResponse(
@@ -447,6 +441,7 @@ public class OrderService : IOrderService
                     ProductId = x.ProductId,
                     ProductName = x.ProductName,
                     UnitPrice = x.UnitPrice,
+                    WeightInGrams = x.WeightInGrams,
                     Quantity = x.Quantity,
                     TotalPrice = x.TotalPrice
                 })

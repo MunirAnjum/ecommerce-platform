@@ -48,12 +48,12 @@ public class CartController : ControllerBase
         return Ok(cart);
     }
 
-    [HttpDelete("item/{productId:guid}")]
-    public async Task<IActionResult> RemoveItemAsync(Guid productId)
+    [HttpDelete("item/{productId:guid}/{weightInGrams:int}")]
+    public async Task<IActionResult> RemoveItemAsync(Guid productId, int weightInGrams)
     {
         var userId = GetUserId();
 
-        await _cartService.RemoveItemAsync(userId, productId);
+        await _cartService.RemoveItemAsync(userId, productId, weightInGrams);
 
         return NoContent();
     }

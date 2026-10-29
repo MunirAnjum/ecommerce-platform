@@ -28,10 +28,12 @@ public class CartRepository : ICartRepository
 
     public async Task<CartItem?> GetItemAsync(
         Guid userId,
-        Guid productId)
+        Guid productId,
+        int weightInGrams)
     {
         return await _context.CartItems
             .Where(x => x.ProductId == productId)
+            .Where(x => x.WeightInGrams == weightInGrams)
             .Where(x => x.Cart.UserId == userId)
             .FirstOrDefaultAsync();
     }

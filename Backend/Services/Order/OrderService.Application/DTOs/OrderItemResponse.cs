@@ -15,6 +15,8 @@ public class OrderItemResponse
 
     public decimal UnitPrice { get; set; }
 
+    public int WeightInGrams { get; set; }
+
     public int Quantity { get; set; }
 
     public decimal TotalPrice { get; set; }

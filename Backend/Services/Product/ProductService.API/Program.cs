@@ -20,7 +20,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
-//builder.Services.AddSwaggerGen();
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -57,6 +56,11 @@ builder.Services.AddDbContext<ProductDbContext>(options =>
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+
+builder.Services.Configure<CloudinarySettings>(
+    builder.Configuration.GetSection(CloudinarySettings.SectionName));
+
+builder.Services.AddScoped<IImageStorageService, CloudinaryImageStorageService>();
 
 builder.Services.AddScoped<IProductService, ProductService.Application.Services.ProductService>();
 

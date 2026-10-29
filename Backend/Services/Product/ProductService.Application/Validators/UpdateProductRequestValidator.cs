@@ -1,12 +1,8 @@
-﻿using FluentValidation;
+using FluentValidation;
 using ProductService.Application.DTOs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProductService.Application.Validators;
+
 public class UpdateProductRequestValidator : AbstractValidator<UpdateProductRequest>
 {
     public UpdateProductRequestValidator()
@@ -24,5 +20,9 @@ public class UpdateProductRequestValidator : AbstractValidator<UpdateProductRequ
         RuleFor(x => x.Price)
             .GreaterThan(0)
             .WithMessage("Price must be greater than zero.");
+
+        RuleFor(x => x.ImageUrl)
+            .MaximumLength(1000)
+            .WithMessage("Image URL cannot exceed 1000 characters.");
     }
 }

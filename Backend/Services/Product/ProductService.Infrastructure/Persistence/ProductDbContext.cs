@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using ProductService.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -39,7 +39,7 @@ public class ProductDbContext : DbContext
         {
             entity.HasKey(x => x.Id);
 
-            entity.Property(x =>x.Name)
+            entity.Property(x => x.Name)
             .IsRequired()
             .HasMaxLength(200);
 
@@ -49,6 +49,12 @@ public class ProductDbContext : DbContext
             entity.Property(x => x.Price)
             .HasPrecision(18, 2);
 
+            entity.Property(x => x.ImageUrl)
+            .HasMaxLength(1000);
+
+            entity.Property(x => x.ImagePublicId)
+            .HasMaxLength(500);
+
             entity.HasOne(x => x.Category)
             .WithMany(x => x.Products)
             .HasForeignKey(x => x.CategoryId)
@@ -56,4 +62,3 @@ public class ProductDbContext : DbContext
         });
     }
 }
-

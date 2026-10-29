@@ -1,13 +1,8 @@
-﻿using FluentValidation;
+using FluentValidation;
 using ProductService.Application.DTOs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProductService.Application.Validators;
+
 public class CreateProductRequestValidator : AbstractValidator<CreateProductRequest>
 {
     public CreateProductRequestValidator()
@@ -29,5 +24,9 @@ public class CreateProductRequestValidator : AbstractValidator<CreateProductRequ
         RuleFor(x => x.CategoryId)
             .NotEmpty()
             .WithMessage("Category is required.");
+
+        RuleFor(x => x.ImageUrl)
+            .MaximumLength(1000)
+            .WithMessage("Image URL cannot exceed 1000 characters.");
     }
 }

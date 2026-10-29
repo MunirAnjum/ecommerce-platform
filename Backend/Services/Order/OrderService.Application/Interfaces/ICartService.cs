@@ -1,10 +1,4 @@
 ﻿using OrderService.Application.DTOs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace OrderService.Application.Interfaces;
 public interface ICartService
 {
@@ -14,5 +8,5 @@ public interface ICartService
 
     Task<CartResponse> UpdateItemAsync(Guid userId, Guid productId, UpdateCartItemRequest request);
 
-    Task RemoveItemAsync(Guid userId, Guid productId);
+    Task RemoveItemAsync(Guid userId, Guid productId, int weightInGrams);
 }

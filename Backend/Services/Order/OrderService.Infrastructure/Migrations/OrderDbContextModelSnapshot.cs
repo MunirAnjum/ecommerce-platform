@@ -94,9 +94,12 @@ namespace OrderService.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<int>("WeightInGrams")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("CartId", "ProductId")
+                    b.HasIndex("CartId", "ProductId", "WeightInGrams")
                         .IsUnique();
 
                     b.ToTable("CartItems");
@@ -152,6 +155,9 @@ namespace OrderService.Infrastructure.Migrations
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("WeightInGrams")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
